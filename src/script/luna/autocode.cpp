@@ -1293,7 +1293,7 @@ void Autocode::Do(bool init)
         }
 
         //+KZ additions
-        
+        /*
         case KZ_SetKZVar:
             {
                 switch ((int) Param1) {
@@ -1319,7 +1319,7 @@ void Autocode::Do(bool init)
                 }
                 
                 
-            }
+            }*/
         
         
         }//switch
@@ -1705,8 +1705,8 @@ static const std::unordered_map<std::string, AutocodeType> s_commandMap =
     {"SpriteTimer", AT_SpriteTimer},
     {"SpriteDebug", AT_SpriteDebug},
     {"StaticDraw", AT_StaticDraw},
-    {"RelativeDraw", AT_RelativeDraw},
-    {"SetKZVar",KZ_SetKZVar}
+    {"RelativeDraw", AT_RelativeDraw}/*,
+    {"SetKZVar",KZ_SetKZVar}*/
 };
 
 AutocodeType Autocode::EnumerizeCommand(char *wbuf, int lineNumber)

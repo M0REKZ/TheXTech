@@ -198,7 +198,7 @@ enum AutocodeType
 
     AT_StaticDraw,
     AT_RelativeDraw,
-    KZ_SetKZVar
+    //KZ_SetKZVar
 };
 
 enum AutocodePredicate
