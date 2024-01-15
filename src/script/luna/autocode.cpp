@@ -1292,6 +1292,36 @@ void Autocode::Do(bool init)
             break;
         }
 
+        //+KZ additions
+        
+        case KZ_SetKZVar:
+            {
+                switch ((int) Param1) {
+                    case 0:
+                        KZNPC[Target].KZENABLED = (bool) Param2;
+                        break;
+                        
+                    case 1:
+                        KZNPC[Target].JumpBounce = (bool) Param2;
+                        break;
+                    case 2:
+                        KZNPC[Target].JumpKill = (bool) Param2;
+                        break;
+                    case 3:
+                        KZNPC[Target].SpinKill = (bool) Param2;
+                        break;
+                    case 4:
+                        KZNPC[Target].SpinBounce = (bool) Param2;
+                        break;
+                    case 5:
+                        KZNPC[Target].NoIceBall = (bool) Param2;
+                        break;
+                }
+                
+                
+            }
+        
+        
         }//switch
 
     }//section
@@ -1675,7 +1705,8 @@ static const std::unordered_map<std::string, AutocodeType> s_commandMap =
     {"SpriteTimer", AT_SpriteTimer},
     {"SpriteDebug", AT_SpriteDebug},
     {"StaticDraw", AT_StaticDraw},
-    {"RelativeDraw", AT_RelativeDraw}
+    {"RelativeDraw", AT_RelativeDraw},
+    {"SetKZVar",KZ_SetKZVar}
 };
 
 AutocodeType Autocode::EnumerizeCommand(char *wbuf, int lineNumber)

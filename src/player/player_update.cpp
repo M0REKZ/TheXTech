@@ -3557,11 +3557,11 @@ void UpdatePlayer()
                                                 if(Player[A].Wet > 0 && (NPCIsCheep[NPC[B].Type] || NPC[B].Type == NPCID_SQUID_S3 || NPC[B].Type == NPCID_SQUID_S1))
                                                 {
                                                 }
-                                                else
+                                                else if(!KZNPC[NPC[B].Type].KZENABLED || (KZNPC[NPC[B].Type].SpinKill && KZNPC[NPC[B].Type].KZENABLED))
                                                     NPCHit(B, 8, A);
                                             }
 
-                                            if(NPC[B].Killed == 8 || NPCIsCheep[NPC[B].Type] || NPC[B].Type == NPCID_SAW ||
+                                            if(NPC[B].Killed == 8 || (!KZNPC[NPC[B].Type].SpinKill && KZNPC[NPC[B].Type].KZENABLED) || NPCIsCheep[NPC[B].Type] || NPC[B].Type == NPCID_SAW ||
                                                NPC[B].Type == NPCID_STONE_S3 || NPC[B].Type == NPCID_STONE_S4 || NPC[B].Type == NPCID_GHOST_S3 ||
                                                NPC[B].Type == NPCID_GHOST_FAST || NPC[B].Type == NPCID_GHOST_S4 || NPC[B].Type == NPCID_BIG_GHOST ||
                                                NPC[B].Type == NPCID_PLANT_S3 || NPC[B].Type == NPCID_LAVABUBBLE || NPC[B].Type == NPCID_SPIKY_S3 ||
@@ -3614,7 +3614,7 @@ void UpdatePlayer()
                                                     {
                                                         if(NPC[B].Killed > 0)
                                                         {
-                                                            if(Player[A].Controls.Down)
+                                                            if(Player[A].Controls.Down || ((!KZNPC[NPC[B].Type].SpinBounce) && KZNPC[NPC[B].Type].KZENABLED))
                                                                 tempHit = false;
                                                             else
                                                                 spinKill = true;
@@ -3931,7 +3931,7 @@ void UpdatePlayer()
                                                 }
                                                 else if((NPC[B].Type == NPCID_LIT_BOMB_S3) || NPC[B].Type == NPCID_HIT_CARRY_FODDER)
                                                     NPCHit(B, 1, A); // NPC 'B' was jumped on '1' by player 'A'
-                                                else if(NPC[B].Killed != 10 && !NPCIsBoot[NPC[B].Type] && !NPCIsYoshi[NPC[B].Type] && !(NPCIsAShell[NPC[B].Type] && NPC[B].CantHurtPlayer == A)) // Bounce off everything except Bonus and Piranha Plants
+                                                else if(NPC[B].Killed != 10 && !NPCIsBoot[NPC[B].Type] && !NPCIsYoshi[NPC[B].Type] && !(NPCIsAShell[NPC[B].Type] &&  NPC[B].CantHurtPlayer == A) && (!KZNPC[NPC[B].Type].KZENABLED || (KZNPC[NPC[B].Type].JumpBounce && KZNPC[NPC[B].Type].KZENABLED))) // Bounce off everything except Bonus and Piranha Plants
                                                 {
                                                     if(NPC[B].Type == NPCID_SPRING)
                                                         tempSpring = true;

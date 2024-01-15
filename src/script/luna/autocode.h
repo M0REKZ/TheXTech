@@ -197,7 +197,8 @@ enum AutocodeType
     AT_SpriteDebug,             //1:        2:              3: Repeat       4: Comp     5: Active time  6:
 
     AT_StaticDraw,
-    AT_RelativeDraw
+    AT_RelativeDraw,
+    KZ_SetKZVar
 };
 
 enum AutocodePredicate

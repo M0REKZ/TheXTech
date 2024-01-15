@@ -2749,6 +2749,13 @@ void SetupVars()
         else
             EffectDefaults.EffectFrames[A] = 1;
     }
+    
+    //Added by +KZ
+    KZNPC[1].KZENABLED = true;
+    KZNPC[1].JumpBounce = false;
+    KZNPC[1].SpinKill = false;
+    KZNPC[1].SpinBounce = false;
+    
     SaveNPCDefaults();
     SavePlayerDefaults();
 }

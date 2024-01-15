@@ -545,6 +545,7 @@ std::string LevelName;
 std::string CurrentLanguage;
 std::string CurrentLangDialect;
 
+RangeArr<KZNPC_t, 0, maxNPCType> KZNPC;
 //void DoEvents()
 //{
 //    g_events->doEvents();

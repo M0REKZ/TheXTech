@@ -467,6 +467,16 @@ struct NPC_t
 
 };
 
+//Custom struct to avoid mememu and merge conflicts
+struct KZNPC_t {
+    bool KZENABLED = false; //if enabled on the npc
+    bool JumpBounce = true;
+    bool JumpKill = true;
+    bool SpinKill = true;
+    bool SpinBounce = true;
+    bool NoIceBall = false; //Still unused
+};
+
 //Public Type Player              'The player data type.
 struct Player_t
 {
@@ -2384,5 +2394,7 @@ const int curRelease = 64;
 //EXTRA: Language
 extern std::string CurrentLanguage;
 extern std::string CurrentLangDialect;
+
+extern RangeArr<KZNPC_t, 0, maxNPCType> KZNPC;
 
 #endif // GLOBALS_H
