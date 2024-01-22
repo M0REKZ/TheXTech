@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -61,12 +61,17 @@ RenderStringOp::~RenderStringOp()
 void RenderStringOp::Draw(Renderer *renderer)
 {
     //        VB6StrPtr text(m_String);
-    float x = m_X, y = m_Y;
+    double x = m_X, y = m_Y;
 
     if(sceneCoords)
     {
         x -= static_cast<float>(vScreen[renderer->GetCameraIdx()].X);
         y -= static_cast<float>(vScreen[renderer->GetCameraIdx()].Y);
+    }
+    else
+    {
+        int w = SuperTextPixLen(m_StringSize, m_String, m_FontType);
+        Render::TranslateScreenCoords(x, y, w, 18);
     }
 
     if(!sceneCoords)

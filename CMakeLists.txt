@@ -141,6 +141,12 @@ else()
     set(THEXTECH_ENABLE_TTF_SUPPORT_DEFAULT ON)
 endif()
 
+if(APPLE OR WIN32 OR (CMAKE_SYSTEM_NAME STREQUAL "Linux"))
+    set(THEXTECH_USE_ANGLE_TRANSLATOR_DEFAULT ON)
+else()
+    set(THEXTECH_USE_ANGLE_TRANSLATOR_DEFAULT OFF)
+endif()
+
 option(USE_SYSTEM_LIBS "Use dependent libraries like SDL2, FreeImageLite and MixerX, installed in the system" ${USE_SYSTEM_LIBS_DEFAULT})
 option(USE_SYSTEM_SDL2 "Use SDL2 from a system even prefering system libraries" ${USE_SYSTEM_SDL2_DEFAULT})
 
@@ -158,6 +164,8 @@ option(THEXTECH_BUILD_GL_DESKTOP_MODERN "On SDL builds, include the OpenGL 2.0+ 
 option(THEXTECH_BUILD_GL_ES_MODERN "On SDL builds, include the OpenGL ES 2.0+ renderer" ON)
 option(THEXTECH_BUILD_GL_DESKTOP_LEGACY "On SDL builds, include the OpenGL 1.1+ renderer" ON)
 option(THEXTECH_BUILD_GL_ES_LEGACY "On SDL builds, include the OpenGL ES 1.1 renderer" OFF)
+
+option(THEXTECH_USE_ANGLE_TRANSLATOR "On modern OpenGL builds, include the ANGLE shader translator to improve shader support in OpenGL 3.0+ Core/Compatibility profiles" ${THEXTECH_USE_ANGLE_TRANSLATOR_DEFAULT})
 
 option(RANGE_ARR_USE_HEAP "Store data of RangeArr<> template in a heap" OFF)
 option(RANGE_ARR_UNSAFE_MODE "Disable all range checks at RangeArr<> template" OFF)
@@ -227,12 +235,21 @@ endif()
 if(EMSCRIPTEN)
     # config for web app deployment manifest
     set(THEXTECH_MANIFEST_NAME "TheXTech Engine ${THEXTECH_VERSION_STRING}" CACHE STRING "Web app manifest name, used as title after installation")
-    set(THEXTECH_MANIFEST_ID "wohlsoft-thextech-${GIT_BRANCH}-${GIT_COMMIT_HASH}" CACHE STRING "Web app ID, uniquely identifies installed app")
+    set(THEXTECH_MANIFEST_ID "wohlsoft-thextech" CACHE STRING "Web app ID, uniquely identifies installed app")
     set(THEXTECH_MANIFEST_DESC "" CACHE STRING "Web app description")
-    set(THEXTECH_DEPLOY_URL "" CACHE STRING "Fully qualified HTTPS URL where application will be deployed")
+    set(THEXTECH_DEPLOY_URL "http://localhost:8080/" CACHE STRING "Fully qualified HTTPS URL where application will be deployed (HTTP may only be used for local testing)")
+
+    # versioned ID
+    if(GIT_BRANCH STREQUAL "main")
+        set(GIT_BRANCH_IF_NOT_MAIN "")
+    else()
+        set(GIT_BRANCH_IF_NOT_MAIN "-${GIT_BRANCH}")
+    endif()
+
+    set(THEXTECH_MANIFEST_ID_V "${THEXTECH_MANIFEST_ID}${GIT_BRANCH_IF_NOT_MAIN}${THEXTECH_VERSION_REL}")
 
     string(CONFIGURE "${THEXTECH_MANIFEST_NAME}" THEXTECH_MANIFEST_NAME_OUT)
-    string(CONFIGURE "${THEXTECH_MANIFEST_ID}"   THEXTECH_MANIFEST_ID_OUT)
+    string(CONFIGURE "${THEXTECH_MANIFEST_ID_V}"   THEXTECH_MANIFEST_ID_OUT)
     string(CONFIGURE "${THEXTECH_MANIFEST_DESC}" THEXTECH_MANIFEST_DESC_OUT)
 endif()
 
@@ -518,6 +535,24 @@ if(THEXTECH_ENABLE_DISCORD_RPC)
     set(THEXTECH_ENABLE_INTEGRATOR ON)  # This feature needs for an Integrator
 endif()
 
+if(THEXTECH_BUILD_GL_DESKTOP_MODERN AND THEXTECH_USE_ANGLE_TRANSLATOR)
+    add_subdirectory(3rdparty/angle-shader-translator)
+
+    message("== Building ANGLE shader translator ==")
+    # suppress some known warnings on GCC / Clang
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        target_compile_options(angle_shader_translator PRIVATE -Wno-unused-parameter)
+        target_compile_options(angle_shader_translator PRIVATE -Wno-c++17-attribute-extensions)
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+        target_compile_options(angle_shader_translator PRIVATE -Wno-unused-parameter)
+        target_compile_options(angle_shader_translator PRIVATE -Wno-c++17-extensions)
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+        target_compile_options(angle_shader_translator PRIVATE /wd4100) # unreferenced formal parameter
+    endif()
+
+    target_link_libraries(A2XT_Int INTERFACE angle_shader_translator)
+endif()
+
 target_link_libraries(A2XT_Int INTERFACE ${A2XT_LIBS})
 target_include_directories(A2XT_Int INTERFACE ${A2XT_INCS})
 
@@ -648,6 +683,7 @@ set(THEXTECH_SRC
     src/main/screen_quickreconnect.cpp
     src/main/screen_textentry.cpp
     src/main/screen_prompt.cpp
+    src/main/screen_progress.cpp
     src/main/game_strings.cpp
     src/main/translate.cpp
     src/main/translate_episode.cpp
@@ -663,6 +699,8 @@ set(THEXTECH_SRC
     src/graphics/gfx_message.cpp
     src/graphics/gfx_editor.cpp
     src/graphics/gfx_frame.cpp
+    src/graphics/gfx_camera.cpp
+    src/graphics/gfx_world.cpp
     src/graphics/gfx_credits.cpp
     src/graphics/gfx_hud.cpp
     src/graphics/gfx_enter_screen.cpp
@@ -699,6 +737,7 @@ set(THEXTECH_SRC
     src/npc/npc_bonus.cpp
     src/npc/npc_queues.cpp
     src/npc/section_overlap.cpp
+    src/npc/npc_activation.cpp
     src/player/player_update.cpp
     src/fontman/font_manager.cpp
     src/fontman/font_manager_private.cpp
@@ -818,7 +857,6 @@ elseif(NINTENDO_DS)
         src/core/16m/window_16m.cpp
         src/core/null/events_null.cpp
         src/core/16m/sound_16m.cpp
-        src/core/16m/packloader.cpp
         src/core/power/power_null.cpp
     )
 elseif(THEXTECH_NO_SDL_BUILD)
@@ -874,6 +912,13 @@ else()
         list(APPEND THEXTECH_SRC
             src/core/opengl/gl_program_bank.cpp
             src/core/opengl/gl_particle_system.cpp
+        )
+    endif()
+
+    if(THEXTECH_BUILD_GL_DESKTOP_MODERN AND THEXTECH_USE_ANGLE_TRANSLATOR)
+        add_definitions(-DTHEXTECH_USE_ANGLE_TRANSLATOR)
+        list(APPEND THEXTECH_SRC
+            src/core/opengl/gl_shader_translator.cpp
         )
     endif()
 
@@ -1123,7 +1168,7 @@ if(VITA)
 
     # Set explicit flags for this project
     target_compile_definitions(thextech PRIVATE
-        -DVITA -DNO_SCREENSHOT -DTHEXTECH_FIXED_RES -DFIXED_RES -DLOW_MEM -DTHEXTECH_PRELOAD_LEVELS -DNO_INTPTROC)
+        -DVITA -DNO_SCREENSHOT -DLOW_MEM -DTHEXTECH_PRELOAD_LEVELS -DNO_INTPTROC)
 endif()
 
 if(WIN32 AND WINDOWS_STORE)
@@ -1138,7 +1183,7 @@ elseif(NINTENDO_WIIU)
     target_compile_definitions(thextech PRIVATE -DPGE_SDL_MUTEX)
 elseif(NINTENDO_DS)
     target_link_libraries(thextech PRIVATE filesystem)
-    target_link_libraries(thextech PRIVATE slim)
+    target_link_libraries(thextech PRIVATE fat)
     target_link_libraries(thextech PRIVATE mm9)
     target_link_libraries(thextech PRIVATE nds9)
     target_compile_definitions(thextech PRIVATE -DPGE_NO_THREADING -DLOW_MEM -DTHEXTECH_PRELOAD_LEVELS -D__16M__)
@@ -1446,12 +1491,6 @@ elseif(NINTENDO_SWITCH)
 elseif(EMSCRIPTEN)
     add_custom_command(
         TARGET thextech POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy
-                "${CMAKE_SOURCE_DIR}/resources/emscripten/sw.js"
-                "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/sw.js")
-
-    add_custom_command(
-        TARGET thextech POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E rename
                 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${THEXTECH_EXECUTABLE_NAME}.html"
                 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/index.html")
@@ -1474,7 +1513,10 @@ elseif(EMSCRIPTEN)
                 "${PGE_PRELOAD_ENVIRONMENT}/graphics/ui/icon/thextech_256.png"
                 "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/thextech_256.png")
 
-    configure_file(${CMAKE_SOURCE_DIR}/resources/emscripten/manifest.json ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/manifest.json)
+    configure_file(${CMAKE_SOURCE_DIR}/resources/emscripten/manifest.json.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/manifest.json)
+
+    configure_file(${CMAKE_SOURCE_DIR}/resources/emscripten/sw.js.in ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/sw.js)
+
 else()
     install(TARGETS thextech
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -1483,33 +1525,61 @@ else()
     )
 
     if(THEXTECH_UNIX_INSTALL)
+        # set up application metadata
+        if(NOT HAIKU)
+            # application launcher
+            if(NOT EXISTS "${DEPENDENCIES_INSTALL_DIR}/share/applications")
+                file(MAKE_DIRECTORY "${DEPENDENCIES_INSTALL_DIR}/share/applications")
+            endif()
+
+            set(DESKTOP_EXEC ${THEXTECH_EXECUTABLE_NAME})
+            set(DESKTOP_ICON ${THEXTECH_EXECUTABLE_NAME})
+            set(DESKTOP_WMCLASS ${THEXTECH_EXECUTABLE_NAME})
+            set(DESKTOP_NAME "TheXTech" CACHE STRING "Name for the application icon")
+            set(DESKTOP_GENERIC_NAME "TheXTech Engine" CACHE STRING "")
+            set(DESKTOP_COMMENT "TheXTech - the modern C++ port and successor of the SMBX engine" CACHE STRING "Short description of the application")
+
+            configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/icon.desktop.in"
+                           "${DEPENDENCIES_INSTALL_DIR}/share/applications/${THEXTECH_EXECUTABLE_NAME}.desktop")
+            install(FILES "${DEPENDENCIES_INSTALL_DIR}/share/applications/${THEXTECH_EXECUTABLE_NAME}.desktop"
+                    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+
+            # flatpak manifest
+            set(FLATPAK_BUILD OFF CACHE BOOL "Is this build a part of a flatpak workflow?")
+            mark_as_advanced(FLATPAK_BUILD)
+            if(FLATPAK_BUILD)
+                set(FLATPAK_DESCRIPTION "TheXTech is an open-source continuation of the SMBX 1.3 platformer game engine. Its highest priority is full compatibility with the SMBX 1.3 content standard, but it also adds a number of enhancements and bugfixes." CACHE STRING "Description for the installable flatpak package.")
+
+                configure_file("${CMAKE_CURRENT_SOURCE_DIR}/resources/flatpak/appdata.xml.in"
+                               "${DEPENDENCIES_INSTALL_DIR}/share/metainfo/${THEXTECH_EXECUTABLE_NAME}.metainfo.xml")
+                install(FILES "${DEPENDENCIES_INSTALL_DIR}/share/metainfo/${THEXTECH_EXECUTABLE_NAME}.metainfo.xml"
+                        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo)
+            endif()
+
+            # application icons
+            if(THEXTECH_SOURCE_ASSETS_PATH AND NOT THEXTECH_SOURCE_ASSETS_PATH STREQUAL "")
+                set(THEXTECH_ICON_PATH "${THEXTECH_SOURCE_ASSETS_PATH}/graphics/ui/icon/")
+            else()
+                set(THEXTECH_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon/")
+            endif()
+
+            install(FILES "${THEXTECH_ICON_PATH}/thextech_16.png"
+                    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
+            install(FILES "${THEXTECH_ICON_PATH}/thextech_32.png"
+                    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
+            install(FILES "${THEXTECH_ICON_PATH}/thextech_48.png"
+                    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
+            install(FILES "${THEXTECH_ICON_PATH}/thextech_128.png"
+                    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
+            install(FILES "${THEXTECH_ICON_PATH}/thextech_256.png"
+                    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
+            install(FILES "${THEXTECH_ICON_PATH}/thextech_512.png" OPTIONAL
+                    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
+        endif()
+
+        # package all assets
         if(THEXTECH_FIXED_ASSETS_PATH AND NOT THEXTECH_FIXED_ASSETS_PATH STREQUAL "" AND
            THEXTECH_SOURCE_ASSETS_PATH AND NOT THEXTECH_SOURCE_ASSETS_PATH STREQUAL "")
-
-            if(NOT HAIKU)
-                if(NOT EXISTS "${DEPENDENCIES_INSTALL_DIR}/share/applications")
-                    file(MAKE_DIRECTORY "${DEPENDENCIES_INSTALL_DIR}/share/applications")
-                endif()
-
-                set(DESKTOP_EXEC ${THEXTECH_EXECUTABLE_NAME})
-                set(DESKTOP_ICON ${THEXTECH_EXECUTABLE_NAME})
-                set(DESKTOP_WMCLASS ${THEXTECH_EXECUTABLE_NAME})
-                configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/icon.desktop.in"
-                               "${DEPENDENCIES_INSTALL_DIR}/share/applications/${THEXTECH_EXECUTABLE_NAME}.desktop")
-                install(FILES "${DEPENDENCIES_INSTALL_DIR}/share/applications/${THEXTECH_EXECUTABLE_NAME}.desktop"
-                        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
-
-                install(FILES "${THEXTECH_SOURCE_ASSETS_PATH}/graphics/ui/icon/thextech_16.png"
-                        DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
-                install(FILES "${THEXTECH_SOURCE_ASSETS_PATH}/graphics/ui/icon/thextech_32.png"
-                        DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
-                install(FILES "${THEXTECH_SOURCE_ASSETS_PATH}/graphics/ui/icon/thextech_48.png"
-                        DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
-                install(FILES "${THEXTECH_SOURCE_ASSETS_PATH}/graphics/ui/icon/thextech_128.png"
-                        DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
-                install(FILES "${THEXTECH_SOURCE_ASSETS_PATH}/graphics/ui/icon/thextech_256.png"
-                        DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps/" RENAME "${THEXTECH_EXECUTABLE_NAME}.png")
-            endif()
 
             file(GLOB THEXTECH_ASSETS_FILES_ROOT_LIST LIST_DIRECTORIES false  "${THEXTECH_SOURCE_ASSETS_PATH}/*")
             install(FILES ${THEXTECH_ASSETS_FILES_ROOT_LIST} DESTINATION "${THEXTECH_FIXED_ASSETS_PATH}")
@@ -1519,11 +1589,12 @@ else()
             install(DIRECTORY "${THEXTECH_SOURCE_ASSETS_PATH}/music" DESTINATION "${THEXTECH_FIXED_ASSETS_PATH}")
             install(DIRECTORY "${THEXTECH_SOURCE_ASSETS_PATH}/sound" DESTINATION "${THEXTECH_FIXED_ASSETS_PATH}")
             install(DIRECTORY "${THEXTECH_SOURCE_ASSETS_PATH}/worlds" DESTINATION "${THEXTECH_FIXED_ASSETS_PATH}")
-
-            install(FILES changelog.txt DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${THEXTECH_EXECUTABLE_NAME})
-            install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${THEXTECH_EXECUTABLE_NAME} RENAME ReadMe.txt)
-            install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${THEXTECH_EXECUTABLE_NAME} RENAME License.TheXTech.txt)
         endif()
+
+        # install readmes
+        install(FILES changelog.txt DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${THEXTECH_EXECUTABLE_NAME})
+        install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${THEXTECH_EXECUTABLE_NAME} RENAME ReadMe.txt)
+        install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${THEXTECH_EXECUTABLE_NAME} RENAME License.TheXTech.txt)
     else()
         install(FILES changelog.txt DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/thextech)
         install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/thextech RENAME ReadMe.txt)

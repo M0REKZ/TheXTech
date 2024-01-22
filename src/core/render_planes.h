@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,8 +40,8 @@ struct RenderPlanes_t
 {
     uint8_t m_current_plane = 0;
 
-    std::array<RP_DEPTH_T, 255> m_plane_depth_default;
-    std::array<RP_DEPTH_T, 255> m_plane_depth;
+    std::array<RP_DEPTH_T, 256> m_plane_depth_default;
+    std::array<RP_DEPTH_T, 256> m_plane_depth;
 
     // decompose plane into 0bxxxxxyyy (32 primary planes)
     // if yyy == 0b000, gets range starting at 0bxxxxxyyy 00000000 (1824 items)

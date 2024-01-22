@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -785,17 +785,17 @@ void SpriteFunc::RelativeDraw(CSprite *me)
 
         if(me->m_AnimationFrame < (signed)me->m_GfxRects.size())
         {
-            double cx = 0;              // camera x (top left of screen)
-            double cy = 0;              // camera y (top left of screen)
+            // double cx = 0;              // camera x (top left of screen)
+            // double cy = 0;              // camera y (top left of screen)
             double sx = me->m_Xpos;     // sprite x position (top left of sprite)
             double sy = me->m_Ypos;     // sprite y position (top left of sprite)
             sx +=  me->m_GfxXOffset;
             sy +=  me->m_GfxYOffset;
 
             // Calc screen draw position based on camera position
-            Render::CalcCameraPos(&cx, &cy);
-            sx = sx - cx;
-            sy = sy - cy;
+            // Render::CalcCameraPos(&cx, &cy);
+            // sx = sx - cx;
+            // sy = sy - cy;
 
             // Register drawing operation
             auto *op = new RenderBitmapOp();
@@ -813,6 +813,7 @@ void SpriteFunc::RelativeDraw(CSprite *me)
                 op->direct_img = me->m_directImg;
             else
                 op->direct_img = Renderer::Get().GetImageForResourceCode(me->m_ImgResCode);
+            op->sceneCoords = true;
 
             Renderer::Get().AddOp(op);
             return;

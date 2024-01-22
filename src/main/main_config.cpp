@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ void OpenConfig_preSetup()
     const IniProcessing::StrEnumMap renderMode =
     {
         {"sw", RENDER_SOFTWARE},
-        {"hw", RENDER_ACCELERATED_SDL},
+        {"hw", RENDER_ACCELERATED_AUTO},
         {"vsync", RENDER_ACCELERATED_VSYNC_DEPRECATED},
         {"sdl", RENDER_ACCELERATED_SDL},
         {"opengl", RENDER_ACCELERATED_OPENGL},
@@ -118,7 +118,31 @@ void OpenConfig_preSetup()
         {"all", VideoSettings_t::SCALE_ALL}
     };
 
-    std::string configPath = AppPathManager::settingsFileSTD();
+    const IniProcessing::StrEnumMap logLevelEnum =
+    {
+        {"0", PGE_LogLevel::NoLog},
+        {"1", PGE_LogLevel::Fatal},
+        {"2", PGE_LogLevel::Critical},
+        {"3", PGE_LogLevel::Warning},
+        {"4", PGE_LogLevel::Info},
+        {"5", PGE_LogLevel::Debug},
+        {"disabled", PGE_LogLevel::NoLog},
+        {"nolog",    PGE_LogLevel::NoLog},
+        {"off",      PGE_LogLevel::NoLog},
+        {"fatal",    PGE_LogLevel::Fatal},
+        {"critical", PGE_LogLevel::Critical},
+        {"warning",  PGE_LogLevel::Warning},
+        {"info",     PGE_LogLevel::Info},
+        {"debug",    PGE_LogLevel::Debug}
+    };
+
+#if defined(DEBUG_BUILD)
+    const PGE_LogLevel::Level c_defaultLogLevel = PGE_LogLevel::Debug;
+#else
+    const PGE_LogLevel::Level c_defaultLogLevel = PGE_LogLevel::Info;
+#endif
+
+    const std::string configPath = AppPathManager::settingsFileSTD();
 
     InitSoundDefaults();
 
@@ -130,8 +154,16 @@ void OpenConfig_preSetup()
         config.read("language", g_config.language, g_config.language);
         config.endGroup();
 
+        config.beginGroup("logging");
+        config.read("log-path", g_pLogGlobalSetup.logPathCustom, std::string());
+        config.read("max-log-count", g_pLogGlobalSetup.maxFilesCount, 10);
+        config.readEnum("log-level", g_pLogGlobalSetup.level, c_defaultLogLevel, logLevelEnum);
+        g_pLogGlobalSetup.logPathDefault = AppPathManager::logsDir();
+        g_pLogGlobalSetup.logPathFallBack = AppPathManager::userAppDirSTD();
+        config.endGroup();
+
         config.beginGroup("video");
-        config.readEnum("render", g_videoSettings.renderMode, (int)RENDER_ACCELERATED_SDL, renderMode);
+        config.readEnum("render", g_videoSettings.renderMode, (int)RENDER_ACCELERATED_AUTO, renderMode);
         config.read("vsync", g_videoSettings.vSync, (g_videoSettings.renderMode == RENDER_ACCELERATED_VSYNC_DEPRECATED));
         config.read("background-work", g_videoSettings.allowBgWork, false);
         config.read("background-controller-input", g_videoSettings.allowBgControllerInput, false);
@@ -139,11 +171,28 @@ void OpenConfig_preSetup()
         config.read("show-fps", g_videoSettings.showFrameRate, false);
 
         if(g_videoSettings.renderMode == RENDER_ACCELERATED_VSYNC_DEPRECATED)
-            g_videoSettings.renderMode = RENDER_ACCELERATED_SDL;
+            g_videoSettings.renderMode = RENDER_ACCELERATED_AUTO;
 
         bool scale_down_all;
         config.read("scale-down-all-textures", scale_down_all, false);
         config.readEnum("scale-down-textures", g_videoSettings.scaleDownTextures, scale_down_all ? (int)VideoSettings_t::SCALE_ALL : (int)VideoSettings_t::SCALE_SAFE, scaleDownTextures);
+        config.read("internal-width", g_config.InternalW, 800);
+        config.read("internal-height", g_config.InternalH, 600);
+
+        ScreenW = g_config.InternalW;
+        ScreenH = g_config.InternalH;
+        // default res for full dynamic res
+        if(ScreenH == 0)
+        {
+            ScreenW = 1280;
+            ScreenH = 720;
+        }
+        // default res for dynamic width
+        else if(ScreenW == 0)
+        {
+            ScreenW = 800;
+        }
+
         IniProcessing::StrEnumMap scaleModes =
         {
             {"linear", SCALE_DYNAMIC_LINEAR},
@@ -206,11 +255,13 @@ void OpenConfig()
         const IniProcessing::StrEnumMap showEpisodeTitle
         {
             {"off", Config_t::EPISODE_TITLE_OFF},
-            {"on", Config_t::EPISODE_TITLE_ON},
-            {"transparent", Config_t::EPISODE_TITLE_TRANSPARENT},
+            {"on", Config_t::EPISODE_TITLE_BOTTOM},
+            {"transparent", Config_t::EPISODE_TITLE_BOTTOM},
+            {"bottom", Config_t::EPISODE_TITLE_BOTTOM},
+            {"top", Config_t::EPISODE_TITLE_TOP},
             {"0", Config_t::EPISODE_TITLE_OFF},
-            {"1", Config_t::EPISODE_TITLE_ON},
-            {"2", Config_t::EPISODE_TITLE_TRANSPARENT}
+            {"1", Config_t::EPISODE_TITLE_BOTTOM},
+            {"2", Config_t::EPISODE_TITLE_BOTTOM}
         };
 
         const IniProcessing::StrEnumMap starsShowPolicy =
@@ -229,6 +280,13 @@ void OpenConfig()
             {"counts-only", Config_t::MEDALS_SHOW_COUNTS},
             {"show", Config_t::MEDALS_SHOW_FULL},
             {"show-full", Config_t::MEDALS_SHOW_FULL}
+        };
+
+        const IniProcessing::StrEnumMap renderInactiveNPC =
+        {
+            {"hide", Config_t::INACTIVE_NPC_HIDE},
+            {"shade", Config_t::INACTIVE_NPC_SHADE},
+            {"show", Config_t::INACTIVE_NPC_SHOW},
         };
 
         config.beginGroup("main");
@@ -276,6 +334,9 @@ void OpenConfig()
         config.read("enable-bowser-iiird-screen-shake", g_config.GameplayShakeScreenBowserIIIrd, true);
         config.read("sfx-player-grow-with-got-item", g_config.SoundPlayerGrowWithGetItem, false);
         config.read("enable-inter-level-fade-effect", g_config.EnableInterLevelFade, true);
+        // config.readEnum("render-inactive-npc", g_config.render_inactive_NPC, (int)Config_t::INACTIVE_NPC_SHADE, renderInactiveNPC);
+        // config.read("autocode-translate-coords", g_config.autocode_translate_coords, true);
+        // config.read("small-screen-camera-features", g_config.small_screen_camera_features, false);
         config.endGroup();
 
         Controls::LoadConfig(ctl);
@@ -323,6 +384,25 @@ void SaveConfig()
     config.setValue("language", g_config.language);
     config.endGroup();
 
+    config.beginGroup("logging");
+    {
+        std::unordered_map<int, std::string> logLevels =
+        {
+            {PGE_LogLevel::NoLog, "disabled"},
+            {PGE_LogLevel::Fatal, "fatal"},
+            {PGE_LogLevel::Critical, "info"},
+            {PGE_LogLevel::Warning, "warning"},
+            {PGE_LogLevel::Info, "info"},
+            {PGE_LogLevel::Debug, "debug"},
+        };
+
+        if(!g_pLogGlobalSetup.logPathCustom.empty())
+            config.setValue("log-path", g_pLogGlobalSetup.logPathCustom);
+        config.setValue("max-log-count", g_pLogGlobalSetup.maxFilesCount);
+        config.setValue("log-level", logLevels[g_pLogGlobalSetup.level]);
+    }
+    config.endGroup();
+
     config.beginGroup("recent");
     config.setValue("episode-1p", g_recentWorld1p);
     config.setValue("episode-2p", g_recentWorld2p);
@@ -334,7 +414,8 @@ void SaveConfig()
         std::unordered_map<int, std::string> renderMode =
         {
             {RENDER_SOFTWARE, "sw"},
-            {RENDER_ACCELERATED_SDL, "hw"},
+            {RENDER_ACCELERATED_AUTO, "hw"},
+            {RENDER_ACCELERATED_SDL, "sdl"},
             {RENDER_ACCELERATED_OPENGL, "opengl"},
             {RENDER_ACCELERATED_OPENGL_ES, "opengles"},
             {RENDER_ACCELERATED_OPENGL_LEGACY, "opengl11"},
@@ -353,8 +434,8 @@ void SaveConfig()
         std::unordered_map<int, std::string> showEpisodeTitle =
         {
             {Config_t::EPISODE_TITLE_OFF, "off"},
-            {Config_t::EPISODE_TITLE_ON, "on"},
-            {Config_t::EPISODE_TITLE_TRANSPARENT, "transparent"}
+            {Config_t::EPISODE_TITLE_TOP, "top"},
+            {Config_t::EPISODE_TITLE_BOTTOM, "bottom"}
         };
 
         std::unordered_map<int, std::string> scaleDownTextures =
@@ -375,6 +456,8 @@ void SaveConfig()
         config.setValue("battery-status", batteryStatus[g_videoSettings.batteryStatus]);
         config.setValue("osk-fill-screen", g_config.osk_fill_screen);
         config.setValue("show-episode-title", showEpisodeTitle[g_config.show_episode_title]);
+        config.setValue("internal-width", g_config.InternalW);
+        config.setValue("internal-height", g_config.InternalH);
         config.setValue("scale-mode", ScaleMode_strings.at(g_videoSettings.scaleMode));
     }
     config.endGroup();
@@ -458,6 +541,9 @@ void SaveConfig()
         config.setValue("enable-bowser-iiird-screen-shake", g_config.GameplayShakeScreenBowserIIIrd);
         config.setValue("sfx-player-grow-with-got-item", g_config.SoundPlayerGrowWithGetItem);
         config.setValue("enable-inter-level-fade-effect", g_config.EnableInterLevelFade);
+
+        // config.setValue("autocode-translate-coords", g_config.autocode_translate_coords);
+        // config.setValue("small-screen-camera-features", g_config.small_screen_camera_features);
     }
     config.endGroup();
 

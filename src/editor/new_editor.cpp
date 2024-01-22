@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1501,6 +1501,8 @@ void EditorScreen::UpdateEventSettingsScreen(CallMode mode)
             Events[m_current_event].SpeedX = 0.1f*(sx-1);
         if(UpdateButton(mode, e_ScreenW - 40 + 4, 40 + (20 * layer_line) + 4, GFX.EIcons, false, 0, 32*Icon::right, 32, 32))
             Events[m_current_event].SpeedX = 0.1f*(sx+1);
+
+        layer_line ++;
     }
 
     if(layer_line == 1)
@@ -1998,6 +2000,8 @@ void EditorScreen::UpdateEditorSettingsScreen(CallMode mode)
         m_special_subpage = maxLocalPlayers;
     if(this->num_test_players < 1)
         this->num_test_players = 1;
+    if(BattleMode /*&& this->num_test_players < 2*/) // currently >2P battle is not supported
+        this->num_test_players = 2;
     if(m_special_subpage > this->num_test_players + 1)
         m_special_subpage = this->num_test_players;
 
@@ -2046,7 +2050,7 @@ void EditorScreen::UpdateEditorSettingsScreen(CallMode mode)
     if(m_special_subpage < maxLocalPlayers && m_special_subpage <= this->num_test_players && UpdateButton(mode, 580 + 4, 140 + 4, GFX.EIcons, false, 0, 32*Icon::right, 32, 32))
         m_special_subpage ++;
 
-    if(m_special_subpage >= this->num_test_players && m_special_subpage != 1)
+    if(m_special_subpage >= this->num_test_players && m_special_subpage != 1 && !(BattleMode && m_special_subpage == 2))
     {
         SuperPrintR(mode, g_editorStrings.wordEnabled, 3, e_ScreenW / 2 + 54, 194);
 

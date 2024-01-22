@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,12 +20,15 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/html5.h>
+#include <SDL2/SDL_events.h>
 #endif
 
 #include "core/opengl/gl_inc.h"
 
 #include "core/opengl/render_gl.h"
 #include "core/opengl/gl_program_object.h"
+#include "core/opengl/gl_shader_translator.h"
 
 #include <FreeImageLite.h>
 #include <Graphics/graphics_funcs.h>
@@ -250,6 +253,17 @@ void RenderGL::addLights(const GLPictureLightInfo& light_info, const QuadI& loc,
     }
 }
 
+#ifdef __EMSCRIPTEN__
+static EM_BOOL s_emscriptenHandleResize(int, const EmscriptenUiEvent *, void *)
+{
+    SDL_Event event;
+    event.type = SDL_WINDOWEVENT;
+    event.window.event = SDL_WINDOWEVENT_RESIZED;
+    SDL_PushEvent(&event);
+    return 0;
+}
+#endif
+
 bool RenderGL::initRender(const CmdLineSetup_t &setup, SDL_Window *window)
 {
     pLogDebug("Init renderer settings...");
@@ -296,12 +310,12 @@ bool RenderGL::initRender(const CmdLineSetup_t &setup, SDL_Window *window)
     if(m_depth_read_texture)
         init_string += "depth read";
 
-    pLogDebug(init_string.c_str());
+    pLogInfo(init_string.c_str());
 
     GLenum err = glGetError();
     if(err)
     {
-        pLogDebug("Render GL: GL error %d occurred during init process, falling back to SDL.", err);
+        pLogWarning("Render GL: GL error %d occurred during init process, falling back to SDL.", err);
         close();
         return false;
     }
@@ -318,6 +332,11 @@ bool RenderGL::initRender(const CmdLineSetup_t &setup, SDL_Window *window)
         s_sparkle = sparkle->get();
 #endif
 
+#ifdef __EMSCRIPTEN__
+    // need to manually add resize event handler due to likely SDL2-side bug suppressing the events
+    emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, 0, s_emscriptenHandleResize);
+#endif
+
     return true;
 }
 
@@ -325,6 +344,8 @@ void RenderGL::close()
 {
     RenderGL::clearAllTextures();
     AbstractRender_t::close();
+
+    XTechShaderTranslator::EnsureQuit();
 
 #ifdef RENDERGL_HAS_SHADERS
     m_standard_program.reset();
@@ -1828,6 +1849,8 @@ void RenderGL::getScreenPixelsRGBA(int x, int y, int w, int h, unsigned char *pi
     {
         mapFromScreen(x, y, &phys_x, &phys_y);
 
+        phys_x *= m_hidpi_x;
+        phys_y *= m_hidpi_y;
         phys_w = w * m_phys_w / ScreenW;
         phys_h = h * m_phys_h / ScreenH;
     }
@@ -1850,6 +1873,10 @@ void RenderGL::getScreenPixelsRGBA(int x, int y, int w, int h, unsigned char *pi
     for(int r = 0; r < h; r++)
     {
         int phys_r = r * phys_h / h;
+
+        // vertical flip from legacy OpenGL to image
+        if(!m_has_fbo || !m_game_texture_fb || !m_game_texture)
+            phys_r = (phys_h - 1) - phys_r;
 
         for(int c = 0; c < w; c++)
         {

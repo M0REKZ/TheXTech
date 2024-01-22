@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,8 +22,11 @@
 #ifndef GFX_UPDATE_H
 #define GFX_UPDATE_H
 
-extern bool g_drawBlocks_valid[2];
-extern bool g_drawBGOs_valid[2];
+#include <array>
+#include "global_constants.h"
+
+extern std::array<bool, maxLocalPlayers> g_drawBlocks_valid;
+extern std::array<bool, maxLocalPlayers> g_drawBGOs_valid;
 
 // should equal the largest X or Y move rate of any layer containing blocks / BGOs
 extern double g_drawBlocks_invalidate_rate;
@@ -32,15 +35,15 @@ extern double g_drawBGOs_invalidate_rate;
 // call when a block is added, moved, or its Hidden attribute is changed
 inline void invalidateDrawBlocks()
 {
-    g_drawBlocks_valid[0] = false;
-    g_drawBlocks_valid[1] = false;
+    for(bool& v : g_drawBlocks_valid)
+        v = false;
 }
 
 // call when a BGO is added, moved, or its Hidden attribute is changed
 inline void invalidateDrawBGOs()
 {
-    g_drawBGOs_valid[0] = false;
-    g_drawBGOs_valid[1] = false;
+    for(bool& v : g_drawBGOs_valid)
+        v = false;
 }
 
 #endif // #ifdef GFX_UPDATE_H

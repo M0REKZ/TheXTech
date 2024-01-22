@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -542,7 +542,7 @@ void MenuLoop()
 
     if(SharedCursor.Primary)
     {
-        const Location_t cursorLoc = newLoc(SharedCursor.X - vScreen[1].X, SharedCursor.Y - vScreen[1].Y);
+        const Location_t cursorLoc = newLoc(SharedCursor.X - vScreen[1].X - vScreen[1].ScreenLeft, SharedCursor.Y - vScreen[1].Y - vScreen[1].ScreenTop);
         if(iRand(5) >= 2)
         {
             NewEffect(EFFID_SPARKLE, cursorLoc);
@@ -559,8 +559,8 @@ void MenuLoop()
                     if(!NPCIsACoin[NPC[A].Type])
                     {
                         NPC[0] = NPC[A];
-                        NPC[0].Location.X = SharedCursor.X - vScreen[1].X;
-                        NPC[0].Location.Y = SharedCursor.Y - vScreen[1].Y;
+                        NPC[0].Location.X = SharedCursor.X - vScreen[1].X - vScreen[1].ScreenLeft;
+                        NPC[0].Location.Y = SharedCursor.Y - vScreen[1].Y - vScreen[1].ScreenTop;
                         NPCHit(A, 3, 0);
                     }
                     else

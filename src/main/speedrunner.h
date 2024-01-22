@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,14 @@ void speedRun_bossDeadEvent();
 void RenderPowerInfo(int player, int bx, int by, int bw, int bh, uint8_t alpha, const XPower::StatusInfo* status);
 void RenderControls(int player, int x, int y, int w, int h, bool missing, uint8_t alpha);
 
-void speedRun_renderControls(int player, int screenZ = -1);
+enum
+{
+    SPEEDRUN_ALIGN_LEFT = -1,
+    SPEEDRUN_ALIGN_AUTO,
+    SPEEDRUN_ALIGN_RIGHT,
+};
+
+void speedRun_renderControls(int player, int screenZ = -1, int align = SPEEDRUN_ALIGN_AUTO);
 void speedRun_renderTimer();
 
 #endif // SPEEDRUNNER_H

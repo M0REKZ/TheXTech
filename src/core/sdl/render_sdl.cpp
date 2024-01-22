@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@
 
 #include "render_sdl.h"
 #include "video.h"
+
 #include "core/window.h"
 #include "core/render.h"
 
@@ -295,7 +296,7 @@ void RenderSDL::updateViewport()
     m_viewport_h = ScreenH;
 
     // update render targets
-    if(m_current_scale_mode != g_videoSettings.scaleMode)
+    if(ScaleWidth != ScreenW || ScaleHeight != ScreenH || m_current_scale_mode != g_videoSettings.scaleMode)
     {
 #ifdef USE_SCREENSHOTS_AND_RECS
         // invalidates GIF recorder handle
@@ -316,6 +317,8 @@ void RenderSDL::updateViewport()
         // reset scaling setting for images loaded later
         SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
 
+        ScaleWidth = ScreenW;
+        ScaleHeight = ScreenH;
         m_current_scale_mode = g_videoSettings.scaleMode;
     }
 }
@@ -558,7 +561,7 @@ void RenderSDL::execute(const RenderOp& op)
         SDL_Rect aRect = {op.xDst, op.yDst, op.wDst, op.hDst};
         SDL_SetRenderDrawColor(m_gRenderer, op.color.r, op.color.g, op.color.b, op.color.a);
 
-        if(op.traits && RenderOp::Traits::filled)
+        if(op.traits & RenderOp::Traits::filled)
             SDL_RenderFillRect(m_gRenderer, &aRect);
         else
             SDL_RenderDrawRect(m_gRenderer, &aRect);

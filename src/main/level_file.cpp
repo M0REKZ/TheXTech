@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
  */
 
 #include "sdl_proxy/sdl_stdinc.h"
+#include "sdl_proxy/sdl_timer.h"
 
 #ifdef THEXTECH_BUILD_GL_MODERN
 #include <json/json.hpp>
@@ -45,9 +46,13 @@
 #include "level_file.h"
 #include "main/level_save_info.h"
 #include "main/level_medals.h"
+#include "main/screen_progress.h"
+#include "main/game_strings.h"
 #include "trees.h"
 #include "npc_special_data.h"
+#include "graphics/gfx_camera.h"
 #include "graphics/gfx_update.h"
+#include "npc/npc_activation.h"
 #include "translate_episode.h"
 #include "fontman/font_manager.h"
 
@@ -185,6 +190,7 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
 //    Location_t tempLocation;
 
     qScreen = false;
+    qScreen_canonical = false;
     ClearLevel();
     BlockSound();
     FreezeNPCs = false;
@@ -280,6 +286,10 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
             CustomMusic[B].clear();
         else
             CustomMusic[B] = g_dirEpisode.resolveFileCase(s.music_file);
+
+        // NOTE: maybe this will get stored and used as a Lua table (instead of as a string) on platforms supporting Lua
+        if(LevelEditor && !s.custom_params.empty())
+            SetS(SectionJSONInfo[B], s.custom_params);
 
 #if defined(THEXTECH_BUILD_GL_MODERN)
         if(!s.custom_params.empty())
@@ -1023,6 +1033,7 @@ void OpenLevelDataPost()
     syncLayers_AllBGOs();
 
     CalculateSectionOverlaps();
+    NPC_ConstructCanonicalSet();
 
     // moved the old event/layer loading code to the top
     // since it is needed before loading objects now
@@ -1139,10 +1150,13 @@ void ClearLevel()
     noUpdate = true;
     BlocksSorted = true;
     qScreen = false;
+    qScreen_canonical = false;
 
 #ifdef __16M__
     XRender::clearAllTextures();
 #endif
+
+    SectionJSONInfo.fill(STRINGINDEX_NONE);
 
 #ifdef THEXTECH_BUILD_GL_MODERN
     SectionEffect.fill(LoadedGLProgramRef_t());
@@ -1153,6 +1167,7 @@ void ClearLevel()
 
     UnloadCustomGFX();
     doShakeScreenClear();
+    ResetCameraPanning();
     treeLevelCleanAll();
     FontManager::clearLevelFonts();
 
@@ -1329,8 +1344,12 @@ void FindStars()
 //    std::string newInput;
     LevelData tempData;
 
+    uint32_t start_time = SDL_GetTicks();
+
     for(int A = 1; A <= numWarps; A++)
     {
+        IndicateProgress(start_time, (double)A / numWarps, g_gameStrings.messageScanningLevels);
+
         auto &warp = Warp[A];
 
         if(warp.level != STRINGINDEX_NONE)

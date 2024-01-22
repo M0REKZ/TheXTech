@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,9 +25,12 @@
 #include "gfx.h"
 #include "core/msgbox.h"
 #include "core/render.h"
+#include "graphics/gfx_frame.h"
+
 #include <IniProcessor/ini_processing.h>
 #include <fmt_format_ne.h>
 #include <Logger/logger.h>
+
 #if defined(__3DS__) || defined(__SWITCH__) || defined(__WII__) || defined(__WIIU__)
 #   include <Utils/files.h>
 #   if defined(__SWITCH__)
@@ -46,7 +49,6 @@
 #else
 #   define  UI_IMG_EXT ".png"
 #endif
-
 
 GFX_t GFX;
 
@@ -175,11 +177,12 @@ bool GFX_t::load()
 
     if(m_loadErrors > 0)
     {
-        std::string msg = fmt::format_ne("Failed to load an UI image assets. Look a log file to get more details:\n{0}"
+        std::string msg = fmt::format_ne("Failed to load UI image assets from {0}. Look a log file to get more details:\n{1}"
                                          "\n\n"
-                                         "It's possible that you didn't installed the game assets package, or you had installed it at the incorrect directory.",
-                                         getLogFilePath());
+                                         "It's possible that you didn't install the game assets package, or you had installed it at the incorrect directory.",
+                                         AppPath, getLogFilePath());
         XMsgBox::simpleMsgBox(XMsgBox::MESSAGEBOX_ERROR, "UI image assets loading error", msg);
+        m_loadErrors = 0;
         return false;
     }
 
@@ -207,7 +210,43 @@ bool GFX_t::load()
         m_loadErrors = 0;
     }
 
-    // Add new optional assets here. Also update load_gfx.cpp:loadCustomUIAssets()
+    loadImage(CharSelIcons, uiPath + "CharSelIcons");
+
+    loadBorder(CharSelFrame, uiPath + "CharSelFrame");
+
+    if(m_loadErrors > 0)
+    {
+        pLogWarning("Missing new char select icons.");
+        m_loadErrors = 0;
+    }
+
+    loadImage(Backdrop, uiPath + "Backdrop");
+    loadBorder(Backdrop_Border, uiPath + "Backdrop_Border");
+
+    if(m_loadErrors > 0)
+    {
+        pLogDebug("Missing new backdrop textures.");
+        m_loadErrors = 0;
+    }
+
+    loadImage(WorldMapFrame_Tile, uiPath + "WorldMapFrame_Tile");
+    loadBorder(WorldMapFrame_Border, uiPath + "WorldMapFrame_Border");
+
+    if(m_loadErrors > 0)
+    {
+        pLogDebug("Missing new world map frame tile/border textures.");
+        m_loadErrors = 0;
+    }
+
+    loadImage(Camera, uiPath + "Camera");
+
+    if(m_loadErrors > 0)
+    {
+        pLogDebug("Missing new small-screen look up/down camera texture.");
+        m_loadErrors = 0;
+    }
+
+    // Add new optional assets above this line. Also update load_gfx.cpp: loadCustomUIAssets(), and gfx.h: GFX_t::m_isCustomVolume.
 
     SDL_assert_release(m_loadedImages.size() <= m_isCustomVolume);
     SDL_memset(m_isCustom, 0, sizeof(m_loadedImages.size() * sizeof(bool)));
@@ -218,7 +257,8 @@ bool GFX_t::load()
 void GFX_t::unLoad()
 {
     for(StdPicture *p : m_loadedImages)
-        XRender::unloadTexture(*p);
+        p->reset();
+
     m_loadedImages.clear();
     SDL_memset(m_isCustom, 0, sizeof(m_loadedImages.size() * sizeof(bool)));
 }

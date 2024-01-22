@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,18 +40,8 @@ struct StdPictureLoad
     //! Generic information about texture type
     int flags = 0;
 
-    //! Pack index (PACK_NONE if not a pack)
-    PackLoader::packref_t pack;
-    uint32_t pack_offset = 0;
-
-    //! Path to find image (could be a pack)
+    //! Path to find image
     std::string path = "";
-
-    inline void clear()
-    {
-        pack = PackLoader::PACK_NONE;
-        pack_offset = 0;
-    }
 };
 
 #endif // #ifndef STD_PICTURE_LOAD_H

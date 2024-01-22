@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -434,6 +434,8 @@ struct NPC_t
     bool Bouce : 1;
 //    DefaultStuck As Boolean
     bool DefaultStuck : 1;
+    // EXTRA (private to npc_activation.cpp): stores whether the NPC needs to use an event logic screen for activation
+    bool _priv_force_canonical : 1;
 
 //'the default values are used when De-Activating an NPC when it goes on screen
 //    DefaultType As Integer
@@ -463,7 +465,7 @@ struct NPC_t
 
     NPC_t() : TurnAround(false), onWall(false), TurnBackWipe(false), GeneratorActive(false),
         playerTemp(false), Legacy(false), Chat(false), NoLavaSplash(false),
-        Bouce(false), DefaultStuck(false) {}
+        Bouce(false), DefaultStuck(false), _priv_force_canonical(false) {}
 
 };
 
@@ -562,14 +564,21 @@ struct Player_t
     int SlideCounter = 0;
 //    ShowWarp As Integer
     int ShowWarp = 0;
-//    GroundPound As Boolean 'for purple yoshi pound
-    bool GroundPound = false;
-//    GroundPound2 As Boolean 'for purple yoshi pound
-    bool GroundPound2 = false;
-//    CanPound As Boolean 'for purple yoshi pound
-    bool CanPound = false;
 //    ForceHold As Integer  'force the player to hold an item for a specific amount of time
     int ForceHold = 0;
+
+    // pound state converted to bitfield
+//    GroundPound As Boolean 'for purple yoshi pound
+    bool GroundPound : 1;
+//    GroundPound2 As Boolean 'for purple yoshi pound
+    bool GroundPound2 : 1;
+//    CanPound As Boolean 'for purple yoshi pound
+    bool CanPound : 1;
+//    NEW: AltRunRelease As Boolean 'has the player not been holding Alt Run?
+    bool AltRunRelease : 1;
+//    DuckRelease As Boolean
+    bool DuckRelease : 1;
+
 //'yoshi powers
 //    YoshiYellow As Boolean
     bool YoshiYellow = false;
@@ -648,8 +657,6 @@ struct Player_t
     int Effect = 0;
 //    Effect2 As Double 'counter for the effects
     double Effect2 = 0.0;
-//    DuckRelease As Boolean
-    bool DuckRelease = false;
 //    Duck As Boolean 'true if ducking
     bool Duck = false;
 //    DropRelease As Boolean
@@ -734,6 +741,8 @@ struct Player_t
 //    SpeedFixY As Single
     float SpeedFixY = 0.0f;
 //End Type
+
+    Player_t() : GroundPound(false), GroundPound2(false), CanPound(false), AltRunRelease(false), DuckRelease(false) {}
 };
 
 //Public Type Background  'Background objects
@@ -1160,6 +1169,8 @@ struct WorldPlayer_t
     int Move3 = 0;
 // EXTRA: last move direction
     int LastMove = 0;
+// EXTRA: current world map section
+    int Section = 0;
 //    LevelName As String
     // std::string LevelName;
     //! NEW: index to player's current WorldLevel, 0 if none. (Replaces LevelName and stars.)
@@ -1599,6 +1610,8 @@ extern RangeArrI<int, 0, maxBlockType, 0> BlockSlope2;
 
 //Public qScreen As Boolean 'Weather or not the screen needs adjusting
 extern bool qScreen;
+//! New: whether any canonical screens are currently in qScreen mode
+extern bool qScreen_canonical;
 
 // moved to "screen.h"
 // NEW: allows screen position to change during qScreen
@@ -1807,6 +1820,10 @@ void g_playWorldMusic(WorldMusic_t &mus);
 extern RangeArrI<bool, 0, maxSections, false> NoTurnBack;
 //Public UnderWater(0 To maxSections) As Boolean
 extern RangeArrI<bool, 0, maxSections, false> UnderWater;
+
+// EXTRA: track extra JSON info from a loaded level
+extern RangeArrI<stringindex_t, 0, maxSections, STRINGINDEX_NONE> SectionJSONInfo;
+
 //Public TestLevel As Boolean
 extern bool TestLevel;
 //Public GameMenu As Boolean

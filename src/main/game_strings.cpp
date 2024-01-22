@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -45,6 +45,9 @@ void initGameStrings()
                                       "entrance warp specified.\n"
                                       "\n"
                                       "File: {0}";
+
+    g_gameStrings.messageScanningLevels = "Scanning levels...";
+    g_gameStrings.formatMinutesSeconds = "{0}m{1}s";
 
     g_gameStrings.warpNeedStarCount = "You need {0} {1} to enter.";
 
