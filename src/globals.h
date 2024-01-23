@@ -472,9 +472,8 @@ struct KZNPC_t {
     bool KZENABLED = false; //if enabled on the npc
     bool JumpBounce = true;
     bool JumpKill = true;
-    bool SpinKill = true;
     bool SpinBounce = true;
-    bool NoIceBall = false; //Still unused
+    bool SpinKill = true;
 };
 
 //Public Type Player              'The player data type.
