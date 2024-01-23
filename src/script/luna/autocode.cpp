@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -252,7 +252,7 @@ void Autocode::Do(bool init)
                     case 1:  // DOWN
                     {
                         //double* pCamera = GM_CAMERA_Y;
-                        double bot = -vScreen[1].Y + ScreenH;
+                        double bot = -vScreen[1].Y + vScreen[1].Height;
                         if(npc->Location.Y > bot - Param2)
                         {
                             npc->Location.Y = (bot - Param2) - 1;
@@ -276,7 +276,7 @@ void Autocode::Do(bool init)
                     case 3: // RIGHT
                     {
                         //double* pCamera = GM_CAMERA_X;
-                        double rt = -vScreen[1].X + ScreenW;
+                        double rt = -vScreen[1].X + vScreen[1].Width;
                         if(npc->Location.Y > rt - Param2)
                         {
                             npc->Location.Y = (rt - Param2) - 1;

@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,10 +59,13 @@ void DrawCredits()
     XRender::renderRect(0, 0, ScreenW, Maths::iRound(CreditChop), {0, 0, 0});
     XRender::renderRect(0, ScreenH - Maths::iRound(CreditChop), ScreenW, std::ceil(CreditChop), {0, 0, 0});
 
-    if(CreditChop > 100)
+    // previously hardcoded to 100
+    int shrink = vScreen[1].Top;
+
+    if(CreditChop > shrink)
     {
-        int chop = CreditChop - 100;
-        int chop_max = (ScreenH / 2) - 100;
+        int chop = CreditChop - shrink;
+        int chop_max = (ScreenH / 2) - shrink;
         uint8_t alpha = 255 * chop / chop_max;
         XRender::renderRect(0, 0, ScreenW, ScreenH, {0, 0, 0, alpha});
     }

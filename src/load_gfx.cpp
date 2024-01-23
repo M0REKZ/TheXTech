@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1041,9 +1041,61 @@ void LoadGFX()
     UpdateLoad();
 }
 
-void UnloadGFX()
+void UnloadGFX(bool reload)
 {
-    // Do nothing
+    if(!reload)
+    {
+        // Do nothing at game exit
+        return;
+    }
+
+    UnloadCustomGFX();
+    UnloadWorldCustomGFX();
+
+    for(int c = 0; c < numCharacters; ++c)
+    {
+        For(A, 1, 10)
+        {
+            (*GFXCharacterBMP[c])[A].reset();
+        }
+    }
+
+    for(int A = 1; A <= maxBlockType; ++A)
+        GFXBlockBMP[A].reset();
+
+    for(int A = 1; A <= numBackground2; ++A)
+        GFXBackground2BMP[A].reset();
+
+    for(int A = 1; A <= maxNPCType; ++A)
+        GFXNPCBMP[A].reset();
+
+    for(int A = 1; A <= maxEffectType; ++A)
+        GFXEffectBMP[A].reset();
+
+    for(int A = 1; A <= maxYoshiGfx; ++A)
+    {
+        GFXYoshiBBMP[A].reset();
+        GFXYoshiTBMP[A].reset();
+    }
+
+    for(int A = 1; A <= maxBackgroundType; ++A)
+        GFXBackgroundBMP[A].reset();
+
+// 'world map
+    for(int A = 1; A <= maxTileType; ++A)
+        GFXTileBMP[A].reset();
+
+    for(int A = 1; A <= maxLevelType; ++A)
+        GFXLevelBMP[A].reset();
+
+    for(int A = 1; A <= maxSceneType; ++A)
+        GFXSceneBMP[A].reset();
+
+    for(int A = 1; A <= numCharacters; ++A)
+        GFXPlayerBMP[A].reset();
+
+    for(int A = 1; A <= maxPathType; ++A)
+        GFXPathBMP[A].reset();
 }
 
 static void loadCustomUIAssets()
@@ -1168,17 +1220,35 @@ static void loadCustomUIAssets()
              "Medals",
              nullptr, nullptr, GFX.isCustom(ci++), GFX.Medals, false, true);
 
-    // suppresses compiler warning of uncalled function, replace when merging multires
-    if(false)
-    {
-        FrameBorder b;
-        bool c;
+    loadCGFX(uiRoot + "CharSelIcons.png",
+             "CharSelIcons",
+             nullptr, nullptr, GFX.isCustom(ci++), GFX.CharSelIcons, false, true);
 
-        loadCBorder(uiRoot + "Backdrop_Border.png",
-                    "Backdrop_Border",
-                    c,
-                    b);
-    }
+    loadCBorder(uiRoot + "CharSelFrame.png",
+             "CharSelFrame",
+             GFX.isCustom(ci++), GFX.CharSelFrame);
+
+    loadCGFX(uiRoot + "Backdrop.png",
+             "Backdrop",
+             nullptr, nullptr, GFX.isCustom(ci++), GFX.Backdrop, false, true);
+
+    loadCBorder(uiRoot + "Backdrop_Border.png",
+             "Backdrop_Border",
+             GFX.isCustom(ci++), GFX.Backdrop_Border);
+
+    loadCGFX(uiRoot + "WorldMapFrame_Tile.png",
+             "WorldMapFrame_Tile",
+             nullptr, nullptr, GFX.isCustom(ci++), GFX.WorldMapFrame_Tile, false, true);
+
+    loadCBorder(uiRoot + "WorldMapFrame_Border.png",
+             "WorldMapFrame_Border",
+             GFX.isCustom(ci++), GFX.WorldMapFrame_Border);
+
+    loadCGFX(uiRoot + "Camera.png",
+             "Camera",
+             nullptr, nullptr, GFX.isCustom(ci++), GFX.Camera, false, true);
+
+    // Add new optional assets above this line. Also update gfx.cpp: GFX_t::load(), and gfx.h: GFX_t::m_isCustomVolume.
 }
 
 void LoadCustomGFX(bool include_world)
@@ -1378,6 +1448,9 @@ void LoaderUpdateDebugString(const std::string &strig)
 #ifndef PGE_NO_THREADING
     SDL_UnlockMutex(gfxLoaderDebugMutex);
 #endif
+
+    if(!gfxLoaderThreadingMode)
+        UpdateLoadREAL();
 }
 
 
@@ -1425,18 +1498,43 @@ void UpdateLoadREAL()
     {
         XRender::setTargetTexture();
         XRender::clearBuffer();
+
+        int sh_w = ScreenW / 2;
+        int gh_w = GFX.MenuGFX[4].w / 2;
+        int sh_h = ScreenH / 2;
+        int gh_h = GFX.MenuGFX[4].h / 2;
+
+        int Left    = sh_w - gh_w;
+        int Top     = sh_h - gh_h;
+        int Right   = sh_w + gh_w;
+        int Bottom  = sh_h + gh_h;
+
+        if(Left < 0)
+            Left = 0;
+
+        if(Top < 0)
+            Top = 0;
+
+        if(Right > ScreenW)
+            Right = ScreenW;
+
+        if(Bottom > ScreenH)
+            Bottom = ScreenH;
+
         if(!gfxLoaderTestMode)
-            XRender::renderTexture(0, 0, GFX.MenuGFX[4]);
+        {
+            XRender::renderTexture(sh_w - gh_w, sh_h - gh_h, GFX.MenuGFX[4]);
+        }
         else
         {
             if(!state.empty())
-                SuperPrint(state, 3, 10, 10);
+                SuperPrint(state, 3, Left + 10, Top + 10);
             else
-                SuperPrint("Loading data...", 3, 10, 10);
+                SuperPrint("Loading data...", 3, Left + 10, Top + 10);
         }
 
-        XRender::renderTexture(632, 576, GFX.Loader);
-        XRender::renderTexture(760, 560, GFX.LoadCoin.w, GFX.LoadCoin.h / 4, GFX.LoadCoin, 0, 32 * LoadCoins);
+        XRender::renderTexture(Right - 168, Bottom - 24, GFX.Loader);
+        XRender::renderTexture(Right - 40, Bottom - 40, GFX.LoadCoin.w, GFX.LoadCoin.h / 4, GFX.LoadCoin, 0, 32 * LoadCoins);
 
         if(gfxLoaderThreadingMode && alphaFader > 0)
             XRender::renderRect(0, 0, ScreenW, ScreenH, {0, 0, 0, alphaFader});
@@ -1447,7 +1545,7 @@ void UpdateLoadREAL()
             SDL_LockMutex(gfxLoaderDebugMutex);
 #endif
             SuperPrint(gfxLoaderDebugString.c_str(), 3,
-                       10, ScreenH - 24,
+                       Left + 10, Bottom - 24,
                        {255, 255, 0, 127});
 
 #ifndef PGE_NO_THREADING
@@ -1457,6 +1555,7 @@ void UpdateLoadREAL()
 
         XRender::repaint();
         XRender::setTargetScreen();
+
         XEvents::doEvents();
 #ifdef __EMSCRIPTEN__
         emscripten_sleep(1); // To repaint screenn, it's required to send a sleep signal

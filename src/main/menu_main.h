@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,6 +37,8 @@ extern std::vector<SelectWorld_t> SelectBattle; // NEW
 // Menu modes
 enum
 {
+    // Main intro
+    MENU_INTRO = -1,
     // Main menu
     MENU_MAIN = 0,
     // One player game episode select
@@ -85,10 +87,14 @@ enum
     MENU_SELECT_SLOT_1P_DELETE = 13,
     MENU_SELECT_SLOT_2P_DELETE = 23,
     MENU_SELECT_SLOT_DELETE_ADD = 3,
+
+    MENU_SELECT_SLOT_END = 30,
 };
 
 struct MainMenuContent
 {
+    std::string introPressStart;
+
     std::string mainStartGame;
     std::string main1PlayerGame;
     std::string mainMultiplayerGame;
@@ -102,6 +108,7 @@ struct MainMenuContent
     std::string languageName;
     std::string pluralRules;
 
+    std::string editorBattles;
     std::string editorNewWorld;
     std::string editorErrorResolution;
     std::string editorErrorMissingResources;
@@ -133,6 +140,7 @@ struct MainMenuContent
     std::string optionsViewCredits;
     std::string optionsRestartEngine;
     std::string optionsRender;
+    std::string optionsRenderAuto;
     std::string optionsRenderX;
     std::string optionsScaleMode;
     std::string optionsScaleInteger;
@@ -161,7 +169,7 @@ struct MainMenuContent
     std::string controlsHotkeys;
 
     std::string controlsOptionRumble;
-    std::string controlsOptionGroundPoundButton;
+    // std::string controlsOptionGroundPoundButton;
     std::string controlsOptionBatteryStatus;
 
     std::string wordProfiles;

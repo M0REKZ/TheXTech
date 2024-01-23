@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the "Software"),
@@ -74,7 +74,11 @@ void updateViewport()
     hardware_w /= 2;
     hardware_h /= 2;
 
+#ifdef __3DS__
+    int ScreenW_Show = ScreenW - MAX_3D_OFFSET * 2;
+#else
     int ScreenW_Show = ScreenW;
+#endif
 
     if(g_videoSettings.scaleMode == SCALE_DYNAMIC_LINEAR || g_videoSettings.scaleMode == SCALE_DYNAMIC_NEAREST)
     {
@@ -412,22 +416,22 @@ inline void minport_RenderTexturePrivate_2(int16_t xDst, int16_t yDst, int16_t w
         return;
 
     // don't go past texture bounds!
-    if(xSrc + wSrc > tx.w)
+    if(xSrc + wSrc > tx.w / 2)
     {
-        if(xSrc >= tx.w)
+        if(xSrc >= tx.w / 2)
             return;
 
-        wDst += tx.w - (xSrc + wSrc);
-        wSrc = tx.w - xSrc;
+        wDst = int32_t(wDst) * (tx.w / 2 - xSrc) / wSrc;
+        wSrc = tx.w / 2 - xSrc;
     }
 
-    if(ySrc + hSrc > tx.h)
+    if(ySrc + hSrc > tx.h / 2)
     {
-        if(ySrc >= tx.h)
+        if(ySrc >= tx.h / 2)
             return;
 
-        hDst += tx.h - (ySrc + hSrc);
-        hSrc = tx.h - ySrc;
+        hDst = int32_t(hDst) * (tx.h / 2 - ySrc) / hSrc;
+        hSrc = tx.h / 2 - ySrc;
     }
 
     minport_RenderTexturePrivate(xDst, yDst, wDst, hDst,

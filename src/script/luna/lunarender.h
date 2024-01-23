@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -145,8 +145,9 @@ public:
 namespace Render
 {
 
-bool IsOnScreen(double x, double y, double w, double h); // Returns whether or not the digven rectangle is on screen this frame
-void CalcCameraPos(double *p_X, double *p_Y);            // Tries to read smbx memory to return the camera coords in the 2 passed args
+bool IsOnScreen(double x, double y, double w, double h);              // Returns whether or not the digven rectangle is on screen this frame
+// void CalcCameraPos(double *p_X, double *p_Y);                         // Tries to read smbx memory to return the camera coords in the 2 passed args
+void TranslateScreenCoords(double &x, double &y, double w, double h); // Converts 800x600 coordinates to dynamic-res coordinates, depending on config options
 
 }
 

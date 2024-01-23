@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the "Software"),
@@ -88,6 +88,9 @@ int s_tex_show_w = 0;
 int s_tex_h = 0;
 
 int s_num_textures_loaded = 0;
+int s_num_bitmasks_loaded = 0;
+bool s_just_unloaded_bitmask = false;
+
 
 C3D_RenderTarget* s_cur_target = nullptr;
 
@@ -127,7 +130,11 @@ static void s_createSceneTargets()
     if(s_tex_h > mem_h)
         s_tex_h = mem_h;
 
-    if(mem_w >= 512 && mem_h == 512)
+    if(s_num_bitmasks_loaded > 0)
+        s_single_layer_mode = true;
+    else if(mem_w >= 512 && mem_h == 512)
+        s_single_layer_mode = true;
+    else if(mem_w >= 512 && mem_h == 512)
         s_single_layer_mode = true;
     else if(should_swap_screen())
         s_single_layer_mode = true;
@@ -146,8 +153,7 @@ static void s_createSceneTargets()
             break;
     }
 
-    // s_tex_show_w = s_tex_w - MAX_3D_OFFSET;
-    s_tex_show_w = s_tex_w;
+    s_tex_show_w = s_tex_w - MAX_3D_OFFSET;
 }
 
 void s_ensureInFrame()
@@ -159,6 +165,21 @@ void s_ensureInFrame()
         // if(g_screen_swapped != should_swap_screen())
         //     UpdateInternalRes();
 
+        // force 2D mode if bitmasks are currently loaded
+        if(s_just_unloaded_bitmask && s_single_layer_mode)
+        {
+            pLogInfo("No longer forbidding 3D mode, since all bitmasks unloaded");
+            s_createSceneTargets();
+        }
+        else if(s_num_bitmasks_loaded > 0 && !s_single_layer_mode)
+        {
+            pLogInfo("Forbidding 3D mode, since a bitmask was loaded");
+            s_createSceneTargets();
+        }
+
+        s_just_unloaded_bitmask = false;
+
+        // initialize the frame and clear render targets
         C3D_FrameBegin(0);
 
         for(int layer = 0; layer < 4; layer++)
@@ -586,8 +607,7 @@ void repaint()
     if(!g_in_frame)
         return;
 
-    constexpr int shift = 0;
-    // constexpr int shift = MAX_3D_OFFSET / 2;
+    constexpr int shift = MAX_3D_OFFSET / 2;
     constexpr double shift_i[] = {shift, shift * 0.4, 0, shift * -0.4};
 
     s_depth_slider = osGet3DSliderState();
@@ -1063,6 +1083,10 @@ void lazyLoad(StdPicture& target)
 
     s_num_textures_loaded++;
 
+    // 3 is the first mask texture
+    if(target.d.texture[3])
+        s_num_bitmasks_loaded++;
+
     if(linearSpaceFree() < 4194304)
     {
         pLogDebug("Triggering free texture memory due to low memory (%u bytes)", (unsigned)linearSpaceFree());
@@ -1087,7 +1111,15 @@ void unloadTexture(StdPicture& tx)
     minport_unlinkTexture(&tx);
 
     if(tx.d.hasTexture())
-        s_num_textures_loaded --;
+        s_num_textures_loaded--;
+
+    // 3 is the first mask texture
+    if(tx.d.texture[3])
+    {
+        s_num_bitmasks_loaded--;
+        if(s_num_bitmasks_loaded == 0)
+            s_just_unloaded_bitmask = true;
+    }
 
     for(int i = 0; i < 6; i++)
     {

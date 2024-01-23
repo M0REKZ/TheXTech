@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@ class GFX_t
     //! Holder of loaded textures for easier clean-up
     std::vector<StdPicture*> m_loadedImages;
     //! Capacity of the m_isCustom array (update when new assets are added)
-    static constexpr size_t m_isCustomVolume = 69;
+    static constexpr size_t m_isCustomVolume = 76;
     //! Holder of "is custom" flag
     bool m_isCustom[m_isCustomVolume];
 
@@ -73,7 +73,7 @@ public:
     RangeArr<StdPicture, 1, 3> Font2;
     StdPicture Font2S;
     RangeArr<StdPicture, 1, 2> Heart;
-    RangeArr<StdPicture, 0, 8> Interface;
+    RangeArr<StdPicture, 0, 8> Interface; // Interface[4] is 37
     StdPicture LoadCoin;
     StdPicture Loader;
     RangeArr<StdPicture, 0, 3> MCursor;
@@ -89,6 +89,13 @@ public:
     StdPicture EIcons;
     StdPicture PCursor;
     StdPicture Medals;
+    StdPicture CharSelIcons;
+    FrameBorder CharSelFrame;
+    StdPicture Backdrop; // Backdrop is 71
+    FrameBorder Backdrop_Border;
+    StdPicture WorldMapFrame_Tile; // WorldMapFrame_Tile is 73
+    FrameBorder WorldMapFrame_Border;
+    StdPicture Camera;
 
     bool &isCustom(size_t i);
 };

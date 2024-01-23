@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
  */
 
 #include "sdl_proxy/sdl_stdinc.h"
+#include "sdl_proxy/sdl_timer.h"
 
 #ifdef __16M__
 // used to clear loaded textures on level/world load
@@ -36,6 +37,8 @@
 #include "level_file.h"
 #include "world_file.h"
 #include "main/level_save_info.h"
+#include "main/screen_progress.h"
+#include "main/game_strings.h"
 #include "translate_episode.h"
 #include "fontman/font_manager.h"
 
@@ -518,9 +521,12 @@ void ClearWorld(bool quick)
 void FindWldStars()
 {
     LevelData tempData;
+    uint32_t start_time = SDL_GetTicks();
 
     for(int A = 1; A <= numWorldLevels; A++)
     {
+        IndicateProgress(start_time, (double)A / numWorldLevels, g_gameStrings.messageScanningLevels);
+
         auto &l = WorldLevel[A];
 
         if(!l.FileName.empty())

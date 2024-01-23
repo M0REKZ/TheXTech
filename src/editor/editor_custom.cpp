@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -965,8 +965,8 @@ void Load(XTechTranslate* translate)
     pLogDebug("Loading editor.ini...");
 
     IniProcessing editor(AppPath + "editor.ini");
-    IniProcessing sound(AppPath + "sound.ini");
-    IniProcessing music(AppPath + "music.ini");
+    // IniProcessing sound(AppPath + "sounds.ini");
+    // IniProcessing music(AppPath + "music.ini");
 
     std::vector<int> temp_ints;
     std::vector<int> temp_layout_pod_indices;

@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -107,8 +107,13 @@ static int loadingThread(void *waiter_ptr)
     UNUSED(waiter_ptr);
 #endif
 
+    LoaderUpdateDebugString("Game info");
+    initGameInfo();
+    cheats_reset();
+
     LoaderUpdateDebugString("Translations");
     XLanguage::findLanguages(); // find present translations
+    ReloadTranslations(); // load translations
 
     SetupPhysics(); // Setup Physics
     SetupGraphics(); // setup graphics
@@ -116,6 +121,9 @@ static int loadingThread(void *waiter_ptr)
 //    GFX.load(); // load the graphics form // Moved to before sound load
     SizableBlocks();
     LoadGFX(); // load the graphics from file
+
+    Controls::LoadTouchScreenGFX();
+
     SetupVars(); //Setup Variables
 
 #ifdef THEXTECH_PRELOAD_LEVELS
@@ -183,125 +191,60 @@ static std::string findIntroLevel()
     return selected;
 }
 
-
-int GameMain(const CmdLineSetup_t &setup)
+// expand the section vertically if the top 8px of the level are empty
+static void s_ExpandSectionForMenu()
 {
-    Player_t blankPlayer;
-//    int A = 0;
-//    int B = 0;
-//    int C = 0;
-    bool tempBool = false;
-    int lastWarpEntered = 0;
+    Location_t& menu_section = level[0];
 
-//    LB = "\n";
-//    EoT = "";
+    // check current section top for expandability
+    Location_t tempLocation = newLoc(menu_section.X, menu_section.Y, menu_section.Width - menu_section.X, 8);
 
-    FrameSkip = setup.frameSkip;
-    noSound = setup.noSound;
-    neverPause = setup.neverPause;
-
-    CompatSetEnforcedLevel(setup.compatibilityLevel);
-
-    g_speedRunnerMode = setup.speedRunnerMode;
-    g_drawController |= setup.showControllerState;
-    speedRun_setSemitransparentRender(setup.speedRunnerSemiTransparent);
-    speedRun_setBlinkEffect(setup.speedRunnerBlinkEffect);
-
-    ResetCompat();
-    cheats_reset();
-
-    // [ !Here was a starting dialog! ]
-
-    //    frmLoader.Show 'show the Splash screen
-    //    Do
-    //        DoEvents
-    //    Loop While StartMenu = False 'wait until the player clicks a button
-
-    // Set global SMBX64 behaviour at PGE-FL
-    FileFormats::SetSMBX64LvlFlags(FileFormats::F_SMBX64_KEEP_LEGACY_NPC_IN_BLOCK_CODES);
-
-    initOutroContent();
-    initMainMenu();
-    initEditorStrings();
-    initGameStrings();
-    StartMenu = true;
-
-    if(!CurrentLanguage.empty())
+    for(int A : treeBlockQuery(tempLocation, SORTMODE_NONE))
     {
-        XTechTranslate translator;
-        if(translator.translate())
-        {
-            pLogDebug("Loaded translation for language %s-%s",
-                      CurrentLanguage.c_str(),
-                      CurrentLangDialect.empty() ? "??" : CurrentLangDialect.c_str());
-        }
+        if(CheckCollision(Block[A].Location, tempLocation))
+            return;
     }
 
-    initAll();
-
-//    Unload frmLoader
-    gfxLoaderTestMode = setup.testLevelMode;
-
-    if(!GFX.load()) // Load UI graphics
-        return 1;
-
-//    If LevelEditor = False Then
-//        frmMain.Show // Show window a bit later
-//    XWindow::show();
-//        GameMenu = True
-    GameMenu = true;
-//    Else
-//        frmSplash.Show
-//        BlocksSorted = True
-//    End If
-
-    LoadingInProcess = true;
-
-    ShowFPS = setup.testShowFPS;
-    MaxFPS = setup.testMaxFPS; // || (g_videoSettings.renderModeObtained == RENDER_ACCELERATED_VSYNC);
-
-    OpenConfig();
-
-    XEvents::doEvents();
-
-#ifdef __EMSCRIPTEN__ // Workaround for a recent Chrome's policy to avoid sudden sound without user's interaction
-    XWindow::show(); // Don't show window until playing an initial sound
-
-    while(!SharedCursor.Primary)
+    for(int A : treeBackgroundQuery(tempLocation, SORTMODE_NONE))
     {
-        XRender::setTargetTexture();
-        XRender::clearBuffer();
-        SuperPrint("Click to start a game", 3, 230, 280);
-        XRender::repaint();
-        XRender::setTargetScreen();
-        XEvents::doEvents();
-        Controls::Update(false);
-        PGE_Delay(10);
+        if(CheckCollision(Background[A].Location, tempLocation))
+            return;
     }
-#endif
 
-    if(!noSound)
-        InitMixerX();
+    // expand level height to a maximum of 2160px
+    if(menu_section.Y > menu_section.Height - 2160)
+        menu_section.Y = menu_section.Height - 2160;
+}
 
-#ifndef PGE_NO_THREADING
-    gfxLoaderThreadingMode = true;
-#endif
-    XWindow::show(); // Don't show window until playing an initial sound
-
-    if(!noSound)
+void MainLoadAll(bool reload)
+{
+    if(reload)
     {
-        if(!setup.testLevelMode)
+        StopAllSounds();
+        StopMusic();
+
+        UnloadSound();
+        UnloadGFX(true);
+        FontManager::quit();
+
+        if(!noSound)
             PlayInitSound();
     }
 
     LoaderInit();
 
+    LoaderUpdateDebugString("Fonts");
+
+    FontManager::initFull();
+
 #ifndef PGE_NO_THREADING
     {
+        gfxLoaderThreadingMode = true;
+
         SDL_Thread*     loadThread;
-        int             threadReturnValue;
         SDL_atomic_t    loadWaiter;
         int             loadWaiterState = 1;
+        int             threadReturnValue;
 
         SDL_AtomicSet(&loadWaiter, loadWaiterState);
         loadThread = SDL_CreateThread(loadingThread, "Loader", &loadWaiter);
@@ -329,9 +272,128 @@ int GameMain(const CmdLineSetup_t &setup)
     loadingThread(nullptr);
 #endif
 
-    LoaderFinish();
+    Integrator::setGameName(g_gameInfo.title, g_gameInfo.statusIconName);
+    XWindow::setTitle(g_gameInfo.titleWindow().c_str());
 
-    LevelSelect = true; // world map is to be shown
+    LoaderFinish();
+}
+
+
+int GameMain(const CmdLineSetup_t &setup)
+{
+    Player_t blankPlayer;
+//    int A = 0;
+//    int B = 0;
+//    int C = 0;
+    bool tempBool = false;
+    int lastWarpEntered = 0;
+
+//    LB = "\n";
+//    EoT = "";
+
+    FrameSkip = setup.frameSkip;
+    noSound = setup.noSound;
+    neverPause = setup.neverPause;
+
+    CompatSetEnforcedLevel(setup.compatibilityLevel);
+
+    g_speedRunnerMode = setup.speedRunnerMode;
+    g_drawController |= setup.showControllerState;
+    speedRun_setSemitransparentRender(setup.speedRunnerSemiTransparent);
+    speedRun_setBlinkEffect(setup.speedRunnerBlinkEffect);
+
+    ResetCompat();
+    // moved into MainLoadAll
+    // cheats_reset();
+
+    // [ !Here was a starting dialog! ]
+
+    //    frmLoader.Show 'show the Splash screen
+    //    Do
+    //        DoEvents
+    //    Loop While StartMenu = False 'wait until the player clicks a button
+
+    // Set global SMBX64 behaviour at PGE-FL
+    FileFormats::SetSMBX64LvlFlags(FileFormats::F_SMBX64_KEEP_LEGACY_NPC_IN_BLOCK_CODES);
+
+    StartMenu = true;
+    MenuMode = MENU_INTRO;
+
+    // strings and translation initialization moved into MainLoadAll
+#if 0
+    initOutroContent();
+    initMainMenu();
+    initEditorStrings();
+    initGameStrings();
+
+    if(!CurrentLanguage.empty())
+    {
+        XTechTranslate translator;
+        if(translator.translate())
+        {
+            pLogDebug("Loaded translation for language %s-%s",
+                      CurrentLanguage.c_str(),
+                      CurrentLangDialect.empty() ? "??" : CurrentLangDialect.c_str());
+        }
+    }
+#endif
+
+    initAll();
+
+//    Unload frmLoader
+    gfxLoaderTestMode = setup.testLevelMode;
+
+    // TODO: check locations in search path
+    if(!GFX.load()) // Load UI graphics
+        return 1;
+
+//    If LevelEditor = False Then
+//        frmMain.Show // Show window a bit later
+//    XWindow::show();
+//        GameMenu = True
+    GameMenu = true;
+//    Else
+//        frmSplash.Show
+//        BlocksSorted = True
+//    End If
+
+    LoadingInProcess = true;
+
+    ShowFPS = setup.testShowFPS;
+    MaxFPS = setup.testMaxFPS; // || (g_videoSettings.renderModeObtained == RENDER_ACCELERATED_VSYNC);
+
+    OpenConfig();
+
+    XEvents::doEvents();
+
+#ifdef __EMSCRIPTEN__ // Workaround for a recent Chrome's policy to avoid sudden sound without user's interaction
+    FontManager::initFull();
+
+    XWindow::show(); // Don't show window until playing an initial sound
+
+    while(!SharedCursor.Primary)
+    {
+        XRender::setTargetTexture();
+        XRender::clearBuffer();
+        SuperPrint("Click to start a game", 3, 230, 280);
+        XRender::repaint();
+        XRender::setTargetScreen();
+        XEvents::doEvents();
+        Controls::Update(false);
+        PGE_Delay(10);
+    }
+#endif
+
+    if(!noSound)
+        InitMixerX();
+
+#ifndef PGE_NO_THREADING
+    gfxLoaderThreadingMode = true;
+#endif
+    XWindow::show(); // Don't show window until playing an initial sound
+
+    if(!noSound && !setup.testLevelMode)
+        PlayInitSound();
 
 #ifdef THEXTECH_INTERPROC_SUPPORTED
     if(setup.interprocess)
@@ -339,7 +401,10 @@ int GameMain(const CmdLineSetup_t &setup)
 #endif
 
     Integrator::initIntegrations();
-    Integrator::setGameName(g_gameInfo.title, g_gameInfo.statusIconName);
+
+    MainLoadAll(false);
+
+    LevelSelect = true; // world map is to be shown
 
     LoadingInProcess = false;
 
@@ -499,7 +564,7 @@ int GameMain(const CmdLineSetup_t &setup)
         {
             // if(resChanged)
             //     ChangeScreen();
-            BattleMode = false;
+            // BattleMode = false;
             SingleCoop = 0;
             numPlayers = 0;
             // ScreenType = 0; // set in SetupScreens()
@@ -512,9 +577,7 @@ int GameMain(const CmdLineSetup_t &setup)
 
             // coming back from a level test
             if(!WorldEditor)
-            {
                 EditorRestore();
-            }
 
             // Run the frame-loop
             runFrameLoop(&EditorLoop,
@@ -523,7 +586,7 @@ int GameMain(const CmdLineSetup_t &setup)
                         nullptr,
                         nullptr);
 
-            MenuMode = MENU_MAIN; // MENU_INTRO when this is implemented
+            MenuMode = MENU_INTRO;
             LevelEditor = false;
             WorldEditor = false;
             XRender::clearBuffer();
@@ -621,7 +684,7 @@ int GameMain(const CmdLineSetup_t &setup)
             }
 
             SetupPlayers();
-            CreditChop = 300; // 100
+            CreditChop = ScreenH / 2; // 100
             EndCredits = 0;
             GameOutroDoQuit = false;
             SetupCredits();
@@ -729,6 +792,7 @@ int GameMain(const CmdLineSetup_t &setup)
             BeatTheGame = false;
             g_ForceBitmaskMerge = false;
             g_ClonedPlayerMode = false;
+            g_CheatLogicScreen = false;
             XRender::unloadGifTextures();
 
             // reinitialize the screens (resets multiplayer preferences)
@@ -766,6 +830,7 @@ int GameMain(const CmdLineSetup_t &setup)
 
             OpenLevel(introPath);
             vScreen[1].X = -level[0].X;
+            s_ExpandSectionForMenu();
 
             if(g_config.EnableInterLevelFade)
                 g_levelScreenFader.setupFader(3, 65, 0, ScreenFader::S_FADE);
@@ -933,6 +998,8 @@ int GameMain(const CmdLineSetup_t &setup)
                 ResetSoundFX();
                 setMusicStartDelay(); // Don't start music until all gfx will be loaded
 
+                worldResetSection();
+
                 if(curWorldMusic > 0)
                     StartMusic(curWorldMusic);
 
@@ -953,6 +1020,7 @@ int GameMain(const CmdLineSetup_t &setup)
 
                 // WorldLoop will automatically resume the music as needed
                 // delayedMusicStart(); // Allow music being started
+                worldResetSection();
 
                 // 'level select loop
                 runFrameLoop(nullptr, &WorldLoop,
@@ -990,6 +1058,7 @@ int GameMain(const CmdLineSetup_t &setup)
                 StartWarp = lastWarpEntered; // When restarting a level (after death), don't restore an entered warp on checkpoints
 
             qScreen = false;
+            qScreen_canonical = false;
             LevelRestartRequested = false;
 
             if(lastWarpEntered != StartWarp)
@@ -1117,6 +1186,14 @@ int GameMain(const CmdLineSetup_t &setup)
                 ++Lives;
                 EveryonesDead();
                 clearScreenFaders();
+
+                if(BattleMode && !LevelEditor && !setup.testLevelMode)
+                {
+                    BattleMode = false;
+                    GameMenu = true;
+                    MenuMode = MENU_BATTLE_MODE;
+                    MenuCursor = selWorld - 1;
+                }
             }
             else // Run the level normally
             {
@@ -1207,6 +1284,7 @@ int GameMain(const CmdLineSetup_t &setup)
 
                     TestLevel = false;
                     LevelEditor = true;
+                    GameMenu = false;
                     SetupPlayers();
 
                     // reopen the temporary level (FullFileName)
@@ -1361,7 +1439,9 @@ void NextLevel()
         if(TestLevel && BattleMode)
         {
             BattleIntro = 150;
-            GameIsActive = false; // Quit game
+
+            // if(!LevelEditor && Backup_FullFileName.empty())
+            //     GameIsActive = false; // Quit game
         }
     }
 }
@@ -1595,7 +1675,7 @@ void UpdateMacro()
                 BeatTheGame = true;
                 SaveGame();
                 GameOutro = true;
-                MenuMode = MENU_MAIN;
+                MenuMode = MENU_INTRO;
                 MenuCursor = 0;
             }
             XRender::clearBuffer();

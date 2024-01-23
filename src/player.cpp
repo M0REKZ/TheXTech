@@ -2,7 +2,7 @@
  * TheXTech - A platform game engine ported from old source code for VB6
  *
  * Copyright (c) 2009-2011 Andrew Spinks, original VB6 code
- * Copyright (c) 2020-2023 Vitaly Novichkov <admin@wohlnet.ru>
+ * Copyright (c) 2020-2024 Vitaly Novichkov <admin@wohlnet.ru>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -167,6 +167,7 @@ void SetupPlayers()
 //    int C = 0;
     FreezeNPCs = false;
     qScreen = false;
+    qScreen_canonical = false;
     ForcedControls = false;
     // online stuff
     //    if(nPlay.Online)
@@ -350,6 +351,7 @@ void SetupPlayers()
         Player[A].WarpBackward = false;
         Player[A].WarpShooted = false;
         Player[A].CanPound = false;
+        Player[A].AltRunRelease = false;
         Player[A].GroundPound = false;
         Player[A].GroundPound2 = false;
         Player[A].Duck = false;
@@ -449,7 +451,8 @@ void SetupPlayers()
     //        StartMusic Player[nPlay.MySlot + 1].Section;
     //    }
     UpdateYoshiMusic();
-    SetupScreens(); // setup the screen depending on how many players there are
+    if(!LevelSelect)
+        SetupScreens(); // setup the screen depending on how many players there are
     setupCheckpoints(); // setup the checkpoint and restpore the player at it if needed
 
     // prepare vScreens for SharedScreen since UpdatePlayer happens before UpdateGraphics
@@ -981,6 +984,55 @@ int CheckLiving()
     return 0;
 }
 
+int CheckNearestLiving(const int A)
+{
+    const Player_t& p = Player[A];
+    const Screen_t& screen = ScreenByPlayer(A);
+
+    int    closest      = 0;
+    double closest_dist = 0;
+
+    // first, look on same screen
+    for(int plr_i = 0; plr_i < screen.player_count; plr_i++)
+    {
+        int o_A = screen.players[plr_i];
+        const Player_t& o_p = Player[o_A];
+
+        if(o_A != A && !o_p.Dead && o_p.TimeToLive == 0)
+        {
+            double dist = (o_p.Location.X - p.Location.X) * (o_p.Location.X - p.Location.X) + (o_p.Location.Y - p.Location.Y) * (o_p.Location.Y - p.Location.Y);
+
+            if(closest == 0 || closest_dist > dist)
+            {
+                closest = o_A;
+                closest_dist = dist;
+            }
+        }
+    }
+
+    if(closest)
+        return closest;
+
+    // next, look at all players
+    for(int o_A = 1; o_A <= numPlayers; o_A++)
+    {
+        const Player_t& o_p = Player[o_A];
+
+        if(o_A != A && !o_p.Dead && o_p.TimeToLive == 0)
+        {
+            double dist = (o_p.Location.X - p.Location.X) * (o_p.Location.X - p.Location.X) + (o_p.Location.Y - p.Location.Y) * (o_p.Location.Y - p.Location.Y);
+
+            if(closest == 0 || closest_dist > dist)
+            {
+                closest = o_A;
+                closest_dist = dist;
+            }
+        }
+    }
+
+    return closest;
+}
+
 int LivingPlayersLeft()
 {
     int ret = 0;
@@ -1075,7 +1127,7 @@ void EveryonesDead()
         ClearLevel();
         LevelSelect = true;
         GameMenu = true;
-        MenuMode = MENU_MAIN;
+        MenuMode = MENU_INTRO;
         MenuCursor = 0;
     }
     XEvents::doEvents();
@@ -3669,7 +3721,7 @@ void YoshiEatCode(const int A)
     }
 }
 
-void RespawnPlayer(int A, double Direction, double CenterX, double StopY)
+void RespawnPlayer(int A, double Direction, double CenterX, double StopY, const vScreen_t& target_screen)
 {
     Player[A].Location.Width = Physics.PlayerWidth[Player[A].Character][Player[A].State];
     Player[A].Location.Height = Physics.PlayerHeight[Player[A].Character][Player[A].State];
@@ -3681,7 +3733,7 @@ void RespawnPlayer(int A, double Direction, double CenterX, double StopY)
     Player[A].Effect = 6;
     // location where player stops flashing
     Player[A].Effect2 = StopY - Player[A].Location.Height;
-    Player[A].Location.Y = -vScreen[1].Y - Player[A].Location.Height;
+    Player[A].Location.Y = -target_screen.Y - Player[A].Location.Height;
     Player[A].Location.X = CenterX - Player[A].Location.Width / 2.0;
 }
 
@@ -3701,7 +3753,11 @@ void RespawnPlayerTo(int A, int TargetPlayer)
     // technically this would fix a vanilla bug (possible weird effects after Player 2 dies, Player 1 goes through Warp, Player 2 respawns)
     //   so I will do it where it only affects the new code.
     // Player[A].Section = Player[TargetPlayer].Section;
-    RespawnPlayer(A, Player[TargetPlayer].Direction, CenterX, StopY);
+
+    // respawn at top of target player's vScreen in >2P mode, otherwise use vScreen 1 as SMBX64 does
+    const vScreen_t& target_screen = (numPlayers > 2) ? vScreenByPlayer(TargetPlayer) : vScreen[1];
+
+    RespawnPlayer(A, Player[TargetPlayer].Direction, CenterX, StopY, target_screen);
 }
 
 void StealBonus()
@@ -3726,12 +3782,12 @@ void StealBonus()
         if(Player[A].Dead)
         {
             // find other player
-            B = alive;
-
             if(Lives > 0 && LevelMacro == LEVELMACRO_OFF)
             {
                 if(Player[A].Controls.Jump || Player[A].Controls.Run)
                 {
+                    B = CheckNearestLiving(A);
+
                     Lives -= 1;
                     Player[A].State = 1;
                     Player[A].Hearts = 1;
@@ -7188,10 +7244,12 @@ void PlayerEffects(const int A)
     }
     else if(p.Effect == 8) // Holding Pattern
     {
+        // tracking a player that got an exit
         if(p.Effect2 < 0)
         {
             p.Location.X = Player[-p.Effect2].Location.X;
             p.Location.Y = Player[-p.Effect2].Location.Y;
+
             if(Player[-p.Effect2].Dead)
                 p.Dead = true;
         }
