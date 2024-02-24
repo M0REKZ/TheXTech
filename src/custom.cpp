@@ -467,7 +467,7 @@ void LoadCustomNPC(int A, std::string cFileName)
 {
     NPCConfigFile npc;
     FileFormats::ReadNpcTXTFileF(std::move(cFileName), npc, true);
-    
+
     if(npc.en_gfxoffsetx)
         NPCFrameOffsetX[A] = npc.gfxoffsetx;
     if(npc.en_gfxoffsety)
@@ -520,16 +520,4 @@ void LoadCustomNPC(int A, std::string cFileName)
         NPCFrameSpeed[A] = int(npc.framespeed);
     if(npc.en_framestyle)
         NPCFrameStyle[A] = int(npc.framestyle);
-    //+KZ
-    if(npc.en_KZENABLED)
-        KZNPC[A].KZENABLED = npc.KZENABLED;
-    if(npc.en_jumpbounce)
-        KZNPC[A].JumpBounce = npc.jumpbounce;
-    if(npc.en_jumpkill)
-        KZNPC[A].JumpKill = npc.jumpkill;
-    if(npc.en_spinbounce)
-        KZNPC[A].SpinBounce = npc.spinbounce;
-    if(npc.en_spinkill)
-        KZNPC[A].SpinKill = npc.spinkill;
-        
 }
