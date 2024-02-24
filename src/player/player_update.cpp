@@ -43,6 +43,7 @@
 #include "../script/msg_preprocessor.h"
 
 #include "npc_id.h"
+#include "npc_traits.h"
 #include "eff_id.h"
 
 #include "npc/npc_queues.h"
@@ -552,7 +553,7 @@ void UpdatePlayer()
                                 if(CheckCollision(tempLocation, Block[B].Location))
                                 {
                                     tempBool = false;
-                                    PlaySound(SFX_BlockHit);
+                                    PlaySoundSpatial(SFX_BlockHit, Player[A].Location);
                                     break;
                                 }
                             }
@@ -560,12 +561,12 @@ void UpdatePlayer()
 
                         if(!tempBool) for(int B : treeNPCQuery(tempLocation, SORTMODE_NONE))
                         {
-                            if(NPCIsABlock[NPC[B].Type] && !NPCStandsOnPlayer[NPC[B].Type] && NPC[B].Active && NPC[B].Type != NPCID_VEHICLE)
+                            if(NPC[B]->IsABlock && !NPC[B]->StandsOnPlayer && NPC[B].Active && NPC[B].Type != NPCID_VEHICLE)
                             {
                                 if(CheckCollision(tempLocation, NPC[B].Location))
                                 {
                                     tempBool = false;
-                                    PlaySound(SFX_BlockHit);
+                                    PlaySoundSpatial(SFX_BlockHit, Player[A].Location);
                                     break;
                                 }
                             }
@@ -1023,7 +1024,7 @@ void UpdatePlayer()
 
                         for(int Bi : treeNPCQuery(tempLocation, SORTMODE_NONE))
                         {
-                            if(NPC[Bi].Active && !NPC[Bi].Hidden && NPCIsAVine[NPC[Bi].Type])
+                            if(NPC[Bi].Active && !NPC[Bi].Hidden && NPC[Bi]->IsAVine)
                             {
                                 if(CheckCollision(tempLocation, NPC[Bi].Location))
                                 {
@@ -1054,7 +1055,7 @@ void UpdatePlayer()
                 }
                 else if(Player[A].Fairy)
                 {
-                    PlaySound(SFX_HeroFairy);
+                    PlaySoundSpatial(SFX_HeroFairy, Player[A].Location);
                     Player[A].Immune = 10;
                     Player[A].Effect = 8;
                     Player[A].Effect2 = 4;
@@ -1213,7 +1214,7 @@ void UpdatePlayer()
                                 else if(Player[A].Controls.Right && Player[A].Location.SpeedX - NPC[Player[A].StandingOnNPC].Location.SpeedX - NPC[Player[A].StandingOnNPC].BeltSpeed >= 0)
                                     Player[A].Location.SpeedY = -1.1 + NPC[Player[A].StandingOnNPC].Location.SpeedY;
                                 else
-                                    PlaySound(SFX_Skid);
+                                    PlaySoundSpatial(SFX_Skid, Player[A].Location);
                                 Player[A].MountSpecial = 1;
                             }
                         }
@@ -1275,7 +1276,7 @@ void UpdatePlayer()
                                 }
                                 if(Player[A].Location.SpeedY > 0)
                                     Player[A].Location.SpeedY = Physics.PlayerJumpVelocity * 0.2;
-                                PlaySound(SFX_Swim);
+                                PlaySoundSpatial(SFX_Swim, Player[A].Location);
                             }
                         }
                     }
@@ -1319,7 +1320,7 @@ void UpdatePlayer()
                                     else if(Player[A].Controls.Right && Player[A].Location.SpeedX - NPC[Player[A].StandingOnNPC].Location.SpeedX - NPC[Player[A].StandingOnNPC].BeltSpeed >= 0)
                                         Player[A].Location.SpeedY = -4.1 + NPC[Player[A].StandingOnNPC].Location.SpeedY;
                                     else
-                                        PlaySound(SFX_Skid);
+                                        PlaySoundSpatial(SFX_Skid, Player[A].Location);
                                     Player[A].MountSpecial = 1;
                                 }
                             }
@@ -1368,7 +1369,7 @@ void UpdatePlayer()
                                 {
                                     if(Player[A].CanJump)
                                     {
-                                        PlaySound(SFX_Whip); // Jump sound
+                                        PlaySoundSpatial(SFX_Whip, Player[A].Location); // Jump sound
                                         Player[A].Jump = Physics.PlayerJumpHeight * 0.6;
                                         NPC[Player[A].StandingOnNPC].Location.SpeedY = Physics.PlayerJumpVelocity * 0.9;
                                     }
@@ -1383,7 +1384,7 @@ void UpdatePlayer()
                                 if((Player[A].Vine > 0 || Player[A].Location.SpeedY == 0 || Player[A].StandingOnNPC != 0 ||
                                     MultiHop || Player[A].Slope > 0 || (Player[A].Location.SpeedY > 0 && Player[A].Quicksand > 0)) && Player[A].CanJump)
                                 {
-                                    PlaySound(SFX_Jump); // Jump sound
+                                    PlaySoundSpatial(SFX_Jump, Player[A].Location); // Jump sound
                                     Player[A].Location.SpeedY = Physics.PlayerJumpVelocity - tempSpeed;
                                     Player[A].Jump = Physics.PlayerJumpHeight;
 
@@ -1454,7 +1455,7 @@ void UpdatePlayer()
                                         Player[A].Location.SpeedY -= 1;
                                         Player[A].CanPound = true;
                                         if(Player[A].YoshiBlue || (Player[A].Mount == 1 && Player[A].MountType == 3))
-                                            PlaySound(SFX_PetTongue);
+                                            PlaySoundSpatial(SFX_PetTongue, Player[A].Location);
                                     }
                                 }
                             }
@@ -1473,7 +1474,7 @@ void UpdatePlayer()
                         {
                             if(Player[A].Controls.Jump && Player[A].JumpRelease)
                             {
-                                PlaySound(SFX_Jump);
+                                PlaySoundSpatial(SFX_Jump, Player[A].Location);
                                 Player[A].Location.SpeedY = Physics.PlayerJumpVelocity;
                                 Player[A].Jump = 10;
                                 Player[A].DoubleJump = false;
@@ -1510,7 +1511,7 @@ void UpdatePlayer()
                                 Player[A].Location.SpeedY = NPC[Player[A].StandingOnNPC].Location.SpeedY;
                                 if(Player[A].Location.SpeedY > 0)
                                     Player[A].Location.SpeedY = 0;
-                                PlaySound(SFX_Skid);
+                                PlaySoundSpatial(SFX_Skid, Player[A].Location);
                                 NPC[Player[A].StandingOnNPC].CantHurt = 30;
                                 NPC[Player[A].StandingOnNPC].CantHurtPlayer = A;
                                 Player[A].Location.SpeedX = NPC[Player[A].StandingOnNPC].Location.SpeedX / 2;
@@ -1564,7 +1565,7 @@ void UpdatePlayer()
                                             Player[A].Location.SpeedX += -NPC[Player[A].StandingOnNPC].Location.SpeedX;
                                     }
 
-                                    PlaySound(SFX_Whip); // Jump sound
+                                    PlaySoundSpatial(SFX_Whip, Player[A].Location); // Jump sound
                                     Player[A].Jump -= 6;
                                     if(Player[A].Direction == 1)
                                         Player[A].SpinFrame = 0;
@@ -1613,7 +1614,7 @@ void UpdatePlayer()
                                     Player[A].Location.SpeedY -= 1;
                                     Player[A].CanPound = true;
                                     if(Player[A].YoshiBlue)
-                                        PlaySound(SFX_PetTongue);
+                                        PlaySoundSpatial(SFX_PetTongue, Player[A].Location);
                                 }
                             }
                             // End If
@@ -1800,7 +1801,7 @@ void UpdatePlayer()
                 // princess peach and toad stuff
                 if(Player[A].Character == 3 || Player[A].Character == 4 || Player[A].Character == 5)
                 {
-                    Player[A].HeldBonus = 0;
+                    Player[A].HeldBonus = NPCID(0);
                     // power up limiter
                     // If (.Character = 3 Or .Character = 4) And .State > 3 And .State <> 7 Then .State = 2
 
@@ -1853,7 +1854,7 @@ void UpdatePlayer()
                                 Player[A].FlyCount = 0;
                                 Player[A].Fairy = true;
                                 SizeCheck(Player[A]);
-                                PlaySound(SFX_HeroFairy);
+                                PlaySoundSpatial(SFX_HeroFairy, Player[A].Location);
                                 Player[A].Immune = 10;
                                 Player[A].Effect = 8;
                                 Player[A].Effect2 = 4;
@@ -1931,7 +1932,7 @@ void UpdatePlayer()
                         if(Player[A].SwordPoke == 1)
                         {
                             TailSwipe(A, true, true);
-                            PlaySound(SFX_HeroStab);
+                            PlaySoundSpatial(SFX_HeroStab, Player[A].Location);
                             if((Player[A].State == 3 || Player[A].State == 7 || Player[A].State == 6) && Player[A].FireBallCD2 == 0)
                             {
                                 Player[A].FireBallCD2 = 40;
@@ -1939,11 +1940,11 @@ void UpdatePlayer()
                                     Player[A].FireBallCD2 = 25;
 
                                 if(Player[A].State == 6)
-                                    PlaySound(SFX_HeroSwordBeam);
+                                    PlaySoundSpatial(SFX_HeroSwordBeam, Player[A].Location);
                                 else if(Player[A].State == 7)
-                                    PlaySound(SFX_HeroIce);
+                                    PlaySoundSpatial(SFX_HeroIce, Player[A].Location);
                                 else
-                                    PlaySound(SFX_HeroFireRod);
+                                    PlaySoundSpatial(SFX_HeroFireRod, Player[A].Location);
 
                                 numNPCs++;
                                 NPC[numNPCs] = NPC_t();
@@ -1955,8 +1956,8 @@ void UpdatePlayer()
                                 if(Player[A].State == 6)
                                     NPC[numNPCs].Type = NPCID_SWORDBEAM;
                                 NPC[numNPCs].Projectile = true;
-                                NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
-                                NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
+                                NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
+                                NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
                                 NPC[numNPCs].Location.X = Player[A].Location.X + Player[A].Location.Width / 2.0 + (40 * Player[A].Direction) - 8;
                                 if(!Player[A].Duck)
                                 {
@@ -2473,7 +2474,7 @@ void UpdatePlayer()
                                                 {
                                                     Player[A].Location.Y = Block[B].Location.Y + Block[B].Location.Height - (Block[B].Location.Height * Slope);
                                                     if(Player[A].Location.SpeedY < 0)
-                                                        PlaySound(SFX_BlockHit);
+                                                        PlaySoundSpatial(SFX_BlockHit, Player[A].Location);
                                                     if(Player[A].Location.SpeedY < -0.01)
                                                         Player[A].Location.SpeedY = -0.01;
                                                     if(Player[A].Mount == 2)
@@ -2675,7 +2676,7 @@ void UpdatePlayer()
                                             Player[A].ShellSurf = false;
                                             Player[A].Location.SpeedY = NPC[Player[A].StandingOnNPC].Location.SpeedY + Physics.PlayerJumpVelocity * 0.75;
                                             Player[A].StandingOnNPC = 0;
-                                            PlaySound(SFX_BlockHit);
+                                            PlaySoundSpatial(SFX_BlockHit, Player[A].Location);
                                         }
 
                                         if(BlockCheckPlayerFilter(B, A))  // Optmizied
@@ -2732,7 +2733,7 @@ void UpdatePlayer()
                                             {
                                                 if(Player[A].Location.SpeedY > 3)
                                                 {
-                                                    PlaySound(SFX_Stone);
+                                                    PlaySoundSpatial(SFX_Stone, Player[A].Location);
                                                     YoshiPound(A, Player[A].Mount, true);
                                                 }
                                             }
@@ -3000,7 +3001,7 @@ void UpdatePlayer()
                             {
                                 if(Player[A].GrabTime == 0)
                                 {
-                                    PlaySound(SFX_Grab);
+                                    PlaySoundSpatial(SFX_Grab, Player[A].Location);
                                     Player[A].FrameCount = 0;
                                     Player[A].GrabSpeed = Player[A].Location.SpeedX;
                                 }
@@ -3056,10 +3057,10 @@ void UpdatePlayer()
                                     Player[A].Multiplier = 0;
                                 BlockHit(tempHit3, true);
                                 Player[A].Location.SpeedY = Physics.PlayerJumpVelocity;
-                                PlaySound(SFX_BlockHit);
+                                PlaySoundSpatial(SFX_BlockHit, Player[A].Location);
                                 if(Player[A].Controls.Jump || Player[A].Controls.AltJump)
                                 {
-                                    PlaySound(SFX_Jump);
+                                    PlaySoundSpatial(SFX_Jump, Player[A].Location);
                                     Player[A].Jump = Physics.PlayerBlockJumpHeight;
                                     if(Player[A].Character == 2)
                                         Player[A].Jump += 3;
@@ -3161,10 +3162,10 @@ void UpdatePlayer()
                             if(!Player[A].Slide)
                                 Player[A].Multiplier = 0;
                             Player[A].Location.SpeedY = Physics.PlayerJumpVelocity;
-                            PlaySound(SFX_BlockHit);
+                            PlaySoundSpatial(SFX_BlockHit, Player[A].Location);
                             if(Player[A].Controls.Jump || Player[A].Controls.AltJump)
                             {
-                                PlaySound(SFX_Jump);
+                                PlaySoundSpatial(SFX_Jump, Player[A].Location);
                                 Player[A].Jump = Physics.PlayerBlockJumpHeight;
                                 if(Player[A].Character == 2)
                                     Player[A].Jump += 3;
@@ -3265,7 +3266,7 @@ void UpdatePlayer()
 //                        Player[A].Location = curLoc;
 //                    }
 
-                    PlaySound(SFX_BlockHit);
+                    PlaySoundSpatial(SFX_BlockHit, Player[A].Location);
                     Player[A].Jump = 0;
                     Player[A].Location.Y = Block[B].Location.Y + Block[B].Location.Height + 0.01;
                     Player[A].Location.SpeedY = -0.01 + Block[B].Location.SpeedY;
@@ -3350,7 +3351,7 @@ void UpdatePlayer()
                                         {
                                             Player[A].Fairy = true;
                                             SizeCheck(Player[A]);
-                                            PlaySound(SFX_HeroFairy);
+                                            PlaySoundSpatial(SFX_HeroFairy, Player[A].Location);
                                             Player[A].Immune = 10;
                                             Player[A].Effect = 8;
                                             Player[A].Effect2 = 4;
@@ -3429,16 +3430,16 @@ void UpdatePlayer()
                             NPC[B].Type != NPCID_ICE_BLOCK
                         )
                         {
-                            if(NPC[B].HoldingPlayer == 0 || NPCIsABonus[NPC[B].Type] || (BattleMode && NPC[B].HoldingPlayer != A))
+                            if(NPC[B].HoldingPlayer == 0 || NPC[B]->IsABonus || (BattleMode && NPC[B].HoldingPlayer != A))
                             {
                                 if(CheckCollision(Player[A].Location, NPC[B].Location))
                                 {
                                     if((NPC[B].Type == NPCID_METALBARREL || NPC[B].Type == NPCID_CANNONENEMY || NPC[B].Type == NPCID_HPIPE_SHORT || NPC[B].Type == NPCID_HPIPE_LONG || NPC[B].Type == NPCID_VPIPE_SHORT || NPC[B].Type == NPCID_VPIPE_LONG) && NPC[B].Projectile)
                                         PlayerHurt(A);
-                                    if((Player[A].Mount == 1 || Player[A].Mount == 3 || Player[A].SpinJump || (Player[A].ShellSurf && NPCIsAShell[NPC[B].Type]) || (Player[A].Stoned && !NPCCanWalkOn[NPC[B].Type])) && !NPCMovesPlayer[NPC[B].Type])
-                                        HitSpot = BootCollision(Player[A].Location, NPC[B].Location, NPCCanWalkOn[NPC[B].Type]); // find the hitspot for normal mario
+                                    if((Player[A].Mount == 1 || Player[A].Mount == 3 || Player[A].SpinJump || (Player[A].ShellSurf && NPC[B]->IsAShell) || (Player[A].Stoned && !NPC[B]->CanWalkOn)) && !NPC[B]->MovesPlayer)
+                                        HitSpot = BootCollision(Player[A].Location, NPC[B].Location, NPC[B]->CanWalkOn); // find the hitspot for normal mario
                                     else
-                                        HitSpot = EasyModeCollision(Player[A].Location, NPC[B].Location, NPCCanWalkOn[NPC[B].Type]); // find the hitspot when in a shoe or on a yoshi
+                                        HitSpot = EasyModeCollision(Player[A].Location, NPC[B].Location, NPC[B]->CanWalkOn); // find the hitspot when in a shoe or on a yoshi
 
                                     if(!NPC[B].Inert)
                                     {
@@ -3455,7 +3456,7 @@ void UpdatePlayer()
                                                     {
                                                         NPCHit(B, 3, B);
                                                         if(NPC[B].Type == NPCID_SWORDBEAM)
-                                                            PlaySound(SFX_HeroHit);
+                                                            PlaySoundSpatial(SFX_HeroHit, Player[A].Location);
                                                     }
                                                     PlayerHurt(A);
                                                 }
@@ -3488,7 +3489,7 @@ void UpdatePlayer()
                                             PlayerHurt(A);
                                             HitSpot = 0;
                                         }
-                                        if((NPCIsAShell[NPC[B].Type] || NPCIsVeggie[NPC[B].Type] ||
+                                        if((NPC[B]->IsAShell || NPCIsVeggie(NPC[B]) ||
                                             NPC[B].Type == NPCID_ICE_CUBE || NPC[B].Type == NPCID_SLIDE_BLOCK) &&
                                             BattleMode && NPC[B].HoldingPlayer > 0 && NPC[B].HoldingPlayer != A)
                                         {
@@ -3498,9 +3499,9 @@ void UpdatePlayer()
                                                 NPCHit(B, 5, B);
                                             }
                                         }
-                                        if(NPCIsAParaTroopa[NPC[B].Type] && BattleMode && NPC[B].CantHurtPlayer == A)
+                                        if(NPCIsAParaTroopa(NPC[B]) && BattleMode && NPC[B].CantHurtPlayer == A)
                                             HitSpot = 0;
-                                        if(BattleMode && NPCIsVeggie[NPC[B].Type] && NPC[B].Projectile != 0)
+                                        if(BattleMode && NPCIsVeggie(NPC[B]) && NPC[B].Projectile != 0)
                                         {
                                             if(NPC[B].CantHurtPlayer != A)
                                             {
@@ -3508,14 +3509,14 @@ void UpdatePlayer()
                                                 {
                                                     PlayerHurt(A);
                                                     NPCHit(B, 4, B);
-                                                    PlaySound(SFX_SpitBossHit);
+                                                    PlaySoundSpatial(SFX_SpitBossHit, Player[A].Location);
                                                 }
                                             }
                                         }
 
                                         if(BattleMode && NPC[B].HoldingPlayer > 0 && NPC[B].HoldingPlayer != A)
                                         {
-                                            if(NPCWontHurt[NPC[B].Type])
+                                            if(NPC[B]->WontHurt)
                                                 HitSpot = 0;
                                             else
                                                 HitSpot = 5;
@@ -3523,14 +3524,14 @@ void UpdatePlayer()
 
                                         if(BattleMode && NPC[B].BattleOwner != A && NPC[B].Projectile != 0 && NPC[B].CantHurtPlayer != A)
                                         {
-                                            if(NPC[B].Type == NPCID_BOMB || NPC[B].Type == NPCID_LIT_BOMB_S3 || NPC[B].Type == NPCID_CARRY_BLOCK_A || NPC[B].Type == NPCID_CARRY_BLOCK_B || NPC[B].Type == NPCID_CARRY_BLOCK_C || NPC[B].Type == NPCID_CARRY_BLOCK_D || NPC[B].Type == NPCID_HIT_CARRY_FODDER || ((NPCIsAShell[NPC[B].Type] || NPC[B].Type == NPCID_SLIDE_BLOCK) && NPC[B].Location.SpeedX == 0))
+                                            if(NPC[B].Type == NPCID_BOMB || NPC[B].Type == NPCID_LIT_BOMB_S3 || NPC[B].Type == NPCID_CARRY_BLOCK_A || NPC[B].Type == NPCID_CARRY_BLOCK_B || NPC[B].Type == NPCID_CARRY_BLOCK_C || NPC[B].Type == NPCID_CARRY_BLOCK_D || NPC[B].Type == NPCID_HIT_CARRY_FODDER || ((NPC[B]->IsAShell || NPC[B].Type == NPCID_SLIDE_BLOCK) && NPC[B].Location.SpeedX == 0))
                                             {
-                                                if(NPCIsAShell[NPC[B].Type] && HitSpot == 1 && Player[A].SpinJump)
+                                                if(NPC[B]->IsAShell && HitSpot == 1 && Player[A].SpinJump)
                                                 {
                                                 }
                                                 else if(Player[A].Immune == 0)
                                                 {
-                                                    if(NPC[B].Type != NPCID_SLIDE_BLOCK && !NPCIsAShell[NPC[B].Type])
+                                                    if(NPC[B].Type != NPCID_SLIDE_BLOCK && !NPC[B]->IsAShell)
                                                         NPCHit(B, 3, B);
                                                     PlayerHurt(A);
                                                     HitSpot = 0;
@@ -3566,7 +3567,7 @@ void UpdatePlayer()
 
                                     // the following code is for spin jumping and landing on things as yoshi/shoe
                                     if(Player[A].Mount == 1 || Player[A].Mount == 3 || Player[A].SpinJump ||
-                                       (Player[A].Stoned && !NPCCanWalkOn[NPC[B].Type]))
+                                       (Player[A].Stoned && !NPC[B]->CanWalkOn))
                                     {
                                         if(HitSpot == 1)
                                         {
@@ -3576,16 +3577,16 @@ void UpdatePlayer()
                                                       NPC[B].Type == NPCID_SPIKY_S3 || NPC[B].Type == NPCID_SPIKY_S4 || NPC[B].Type == NPCID_SPIKY_BALL_S4 || NPC[B].Type == NPCID_BOTTOM_PLANT ||
                                                       NPC[B].Type == NPCID_SIDE_PLANT || NPC[B].Type == NPCID_CRAB || NPC[B].Type == NPCID_FLY || NPC[B].Type == NPCID_BIG_PLANT ||
                                                       NPC[B].Type == NPCID_PLANT_S1 || NPC[B].Type == NPCID_VILLAIN_S1 || NPC[B].Type == NPCID_WALL_BUG || NPC[B].Type == NPCID_WALL_TURTLE ||
-                                                      NPC[B].Type == NPCID_SICK_BOSS || NPC[B].Type == NPCID_WALK_PLANT || NPC[B].Type == NPCID_JUMP_PLANT) && !NPCCanWalkOn[NPC[B].Type])
+                                                      NPC[B].Type == NPCID_SICK_BOSS || NPC[B].Type == NPCID_WALK_PLANT || NPC[B].Type == NPCID_JUMP_PLANT) && !NPC[B]->CanWalkOn)
                                             {
-                                                if(Player[A].Wet > 0 && (NPCIsCheep[NPC[B].Type] || NPC[B].Type == NPCID_SQUID_S3 || NPC[B].Type == NPCID_SQUID_S1))
+                                                if(Player[A].Wet > 0 && (NPC[B]->IsFish || NPC[B].Type == NPCID_SQUID_S3 || NPC[B].Type == NPCID_SQUID_S1))
                                                 {
                                                 }
                                                 else if(!KZNPC[NPC[B].Type].KZENABLED || (KZNPC[NPC[B].Type].SpinKill && KZNPC[NPC[B].Type].KZENABLED))
                                                     NPCHit(B, 8, A);
                                             }
 
-                                            if(NPC[B].Killed == 8 || (!KZNPC[NPC[B].Type].SpinKill && KZNPC[NPC[B].Type].KZENABLED) || NPCIsCheep[NPC[B].Type] || NPC[B].Type == NPCID_SAW ||
+                                            if(NPC[B].Killed == 8 || (!KZNPC[NPC[B].Type].SpinKill && KZNPC[NPC[B].Type].KZENABLED) || NPC[B]->IsFish || NPC[B].Type == NPCID_SAW ||
                                                NPC[B].Type == NPCID_STONE_S3 || NPC[B].Type == NPCID_STONE_S4 || NPC[B].Type == NPCID_GHOST_S3 ||
                                                NPC[B].Type == NPCID_GHOST_FAST || NPC[B].Type == NPCID_GHOST_S4 || NPC[B].Type == NPCID_BIG_GHOST ||
                                                NPC[B].Type == NPCID_PLANT_S3 || NPC[B].Type == NPCID_LAVABUBBLE || NPC[B].Type == NPCID_SPIKY_S3 ||
@@ -3605,8 +3606,8 @@ void UpdatePlayer()
                                                     NPC[numNPCs].Section = Player[A].Section;
                                                     NPC[numNPCs].Type = NPCID_PLR_FIREBALL;
                                                     NPC[numNPCs].Special = Player[A].Character;
-                                                    NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
-                                                    NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
+                                                    NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
+                                                    NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
                                                     NPC[numNPCs].Location.Y = Player[A].Location.Height + Player[A].Location.Y - NPC[numNPCs].Location.Height;
                                                     NPC[numNPCs].Location.X = Player[A].Location.X + Player[A].Location.Width / 2.0 - NPC[numNPCs].Location.Width / 2.0;
                                                     NPC[numNPCs].Location.SpeedX = 4;
@@ -3619,8 +3620,8 @@ void UpdatePlayer()
                                                     NPC[numNPCs].Section = Player[A].Section;
                                                     NPC[numNPCs].Type = NPCID_PLR_FIREBALL;
                                                     NPC[numNPCs].Special = Player[A].Character;
-                                                    NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
-                                                    NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
+                                                    NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
+                                                    NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
                                                     NPC[numNPCs].Location.Y = Player[A].Location.Height + Player[A].Location.Y - NPC[numNPCs].Location.Height;
                                                     NPC[numNPCs].Location.X = Player[A].Location.X + Player[A].Location.Width / 2.0 - NPC[numNPCs].Location.Width / 2.0;
                                                     NPC[numNPCs].Location.SpeedX = -4;
@@ -3628,7 +3629,7 @@ void UpdatePlayer()
                                                     syncLayers_NPC(numNPCs);
                                                 }
                                                 if(NPC[B].Killed == 0 && Player[A].SpinJump == 0)
-                                                    PlaySound(SFX_Stomp);
+                                                    PlaySoundSpatial(SFX_Stomp, Player[A].Location);
                                                 Player[A].ForceHitSpot3 = true;
                                                 if(HitSpot == 1 && !(Player[A].GroundPound && NPC[B].Killed == 8))
                                                 {
@@ -3644,7 +3645,7 @@ void UpdatePlayer()
                                                                 spinKill = true;
                                                         }
                                                         else
-                                                            PlaySound(SFX_Stomp);
+                                                            PlaySoundSpatial(SFX_Stomp, Player[A].Location);
                                                     }
                                                 }
                                                 HitSpot = 0;
@@ -3678,7 +3679,7 @@ void UpdatePlayer()
                                     {
                                         if(NPC[B].Type == NPCID_STATUE_FIRE || NPC[B].Type == NPCID_VILLAIN_FIRE || NPC[B].Type == NPCID_PLANT_FIRE || NPC[B].Type == NPCID_QUAD_BALL)
                                         {
-                                            PlaySound(SFX_BlockHit);
+                                            PlaySoundSpatial(SFX_BlockHit, Player[A].Location);
                                             HitSpot = 0;
                                             NPC[B].Killed = 9;
                                             NPCQueues::Killed.push_back(B);
@@ -3701,7 +3702,7 @@ void UpdatePlayer()
                                     }
 
 
-                                    if(NPCIsAVine[NPC[B].Type]) // if the player collided with a vine then see if he should climb it
+                                    if(NPC[B]->IsAVine) // if the player collided with a vine then see if he should climb it
                                     {
                                         if(Player[A].Character == 5)
                                         {
@@ -3714,7 +3715,7 @@ void UpdatePlayer()
                                                 {
                                                     Player[A].Fairy = true;
                                                     SizeCheck(Player[A]);
-                                                    PlaySound(SFX_HeroFairy);
+                                                    PlaySoundSpatial(SFX_HeroFairy, Player[A].Location);
                                                     Player[A].Immune = 10;
                                                     Player[A].Effect = 8;
                                                     Player[A].Effect2 = 4;
@@ -3769,7 +3770,7 @@ void UpdatePlayer()
                                         {
                                             NPC[B].Killed = 9;
                                             NPCQueues::Killed.push_back(B);
-                                            PlaySound(SFX_Door);
+                                            PlaySoundSpatial(SFX_Door, Player[A].Location);
                                             Player[A].Effect = 7;
                                             Player[A].Warp = numWarps + 1;
                                             Player[A].WarpBackward = false;
@@ -3816,7 +3817,7 @@ void UpdatePlayer()
 
                                     if(HitSpot == 1) // Player landed on a NPC
                                     {
-                                        if(NPCCanWalkOn[NPC[B].Type] || (Player[A].ShellSurf && NPCIsAShell[NPC[B].Type])) // NPCs that can be walked on
+                                        if(NPC[B]->CanWalkOn || (Player[A].ShellSurf && NPC[B]->IsAShell)) // NPCs that can be walked on
                                         {
                                             // the player landed on an NPC he can stand on
                                             if(tempBlockHit[1] == 0)
@@ -3844,11 +3845,11 @@ void UpdatePlayer()
 
                                             // if landing on a yoshi or boot, mount up!
                                         }
-                                        else if((NPCIsYoshi[NPC[B].Type] || NPCIsBoot[NPC[B].Type]) && Player[A].Character != 5 && !Player[A].Fairy)
+                                        else if((NPCIsYoshi(NPC[B]) || NPCIsBoot(NPC[B])) && Player[A].Character != 5 && !Player[A].Fairy)
                                         {
                                             if(Player[A].Mount == 0 && NPC[B].CantHurtPlayer != A && Player[A].Dismount == 0)
                                             {
-                                                if(NPCIsBoot[NPC[B].Type])
+                                                if(NPCIsBoot(NPC[B]))
                                                 {
                                                     UnDuck(Player[A]);
                                                     NPC[B].Killed = 9;
@@ -3865,9 +3866,9 @@ void UpdatePlayer()
                                                         Player[A].MountType = 2;
                                                     if(NPC[B].Type == NPCID_BLU_BOOT)
                                                         Player[A].MountType = 3;
-                                                    PlaySound(SFX_Stomp);
+                                                    PlaySoundSpatial(SFX_Stomp, Player[A].Location);
                                                 }
-                                                else if(NPCIsYoshi[NPC[B].Type] && (Player[A].Character == 1 || Player[A].Character == 2))
+                                                else if(NPCIsYoshi(NPC[B]) && (Player[A].Character == 1 || Player[A].Character == 2))
                                                 {
                                                     UnDuck(Player[A]);
                                                     NPC[B].Killed = 9;
@@ -3894,7 +3895,7 @@ void UpdatePlayer()
                                                     Player[A].MountSpecial = 0;
                                                     Player[A].YoshiTonugeBool = false;
                                                     Player[A].YoshiTongueLength = 0;
-                                                    PlaySound(SFX_Pet);
+                                                    PlaySoundSpatial(SFX_Pet, Player[A].Location);
                                                     UpdateYoshiMusic();
                                                     YoshiHeight(A);
                                                 }
@@ -3902,7 +3903,7 @@ void UpdatePlayer()
                                         }
                                         else if(NPC[B].Type != NPCID_CANNONITEM && NPC[B].Type != NPCID_KEY &&
                                                 NPC[B].Type != NPCID_TOOTHYPIPE && NPC[B].Type != NPCID_TOOTHY &&
-                                                (!Player[A].SlideKill || NPCWontHurt[NPC[B].Type])) // NPCs that cannot be walked on
+                                                (!Player[A].SlideKill || NPC[B]->WontHurt)) // NPCs that cannot be walked on
                                         {
                                             if(NPC[B].CantHurtPlayer == A && Player[A].NoShellKick > 0)
                                             {
@@ -3910,17 +3911,18 @@ void UpdatePlayer()
                                             }
                                             else
                                             {
-                                                if(NPCIsABonus[NPC[B].Type]) // Bonus
+                                                if(NPC[B]->IsABonus) // Bonus
                                                     TouchBonus(A, B);
-                                                else if(NPCIsAShell[NPC[B].Type] && NPC[B].Location.SpeedX == 0 && Player[A].HoldingNPC == 0 && Player[A].Controls.Run)
+                                                else if(NPC[B]->IsAShell && NPC[B].Location.SpeedX == 0 && Player[A].HoldingNPC == 0 && Player[A].Controls.Run)
                                                 {
                                                     // grab turtle shells
                                                     //if(nPlay.Online == false || nPlay.MySlot + 1 == A)
                                                     {
                                                         if(Player[A].Character >= 3)
-                                                            PlaySound(SFX_Grab);
+                                                            PlaySoundSpatial(SFX_Grab, Player[A].Location);
                                                         else
                                                             UnDuck(Player[A]);
+
                                                         Player[A].HoldingNPC = B;
                                                         NPC[B].HoldingPlayer = A;
                                                         NPC[B].CantHurt = Physics.NPCCanHurtWait;
@@ -3928,9 +3930,9 @@ void UpdatePlayer()
                                                     }
 
                                                 }
-                                                else if(NPCJumpHurt[NPC[B].Type] || (NPCIsCheep[NPC[B].Type] && Player[A].WetFrame)) // NPCs that cause damage even when jumped on
+                                                else if(NPC[B]->JumpHurt || (NPC[B]->IsFish && Player[A].WetFrame)) // NPCs that cause damage even when jumped on
                                                 {
-                                                    if(!(NPC[B].Type == NPCID_PLANT_S3 && NPC[B].Special2 == 4) && !NPCWontHurt[NPC[B].Type] && NPC[B].CantHurtPlayer != A)
+                                                    if(!(NPC[B].Type == NPCID_PLANT_S3 && NPC[B].Special2 == 4) && !NPC[B]->WontHurt && NPC[B].CantHurtPlayer != A)
                                                     {
 
                                                         // the n00bcollision function reduces the size of the npc's hit box before it damages the player
@@ -3943,7 +3945,7 @@ void UpdatePlayer()
                                                     if(NPC[B].Special == 0 || Player[A].Mount == 1 || Player[A].Mount == 3)
                                                     {
                                                         if(NPC[B].Special != 0)
-                                                            PlaySound(SFX_Stomp);
+                                                            PlaySoundSpatial(SFX_Stomp, Player[A].Location);
                                                         tempHit = true;
                                                         tempLocation.Y = NPC[B].Location.Y - Player[A].Location.Height;
                                                     }
@@ -3955,11 +3957,12 @@ void UpdatePlayer()
                                                 }
                                                 else if((NPC[B].Type == NPCID_LIT_BOMB_S3) || NPC[B].Type == NPCID_HIT_CARRY_FODDER)
                                                     NPCHit(B, 1, A); // NPC 'B' was jumped on '1' by player 'A'
-                                                else if(NPC[B].Killed != 10 && !NPCIsBoot[NPC[B].Type] && !NPCIsYoshi[NPC[B].Type] && !(NPCIsAShell[NPC[B].Type] &&  NPC[B].CantHurtPlayer == A) && (!KZNPC[NPC[B].Type].KZENABLED || (KZNPC[NPC[B].Type].JumpBounce && KZNPC[NPC[B].Type].KZENABLED))) // Bounce off everything except Bonus and Piranha Plants
+
+                                                else if(NPC[B].Killed != 10 && !NPCIsBoot(NPC[B]) && !NPCIsYoshi(NPC[B]) && !(NPC[B]->IsAShell && NPC[B].CantHurtPlayer == A)  && (!KZNPC[NPC[B].Type].KZENABLED || (KZNPC[NPC[B].Type].JumpBounce && KZNPC[NPC[B].Type].KZENABLED))) // Bounce off everything except Bonus and Piranha Plants
                                                 {
                                                     if(NPC[B].Type == NPCID_SPRING)
                                                         tempSpring = true;
-                                                    if(NPCIsAShell[NPC[B].Type] && NPC[B].Location.SpeedX == 0 && NPC[B].Location.SpeedY == 0)
+                                                    if(NPC[B]->IsAShell && NPC[B].Location.SpeedX == 0 && NPC[B].Location.SpeedY == 0)
                                                         tempShell = true;
                                                     tempHit = true;
                                                     tempLocation.Y = NPC[B].Location.Y - Player[A].Location.Height;
@@ -3976,7 +3979,7 @@ void UpdatePlayer()
                                                 if(
                                                         !(
                                                                 (Player[A].WetFrame && (NPC[B].Type == NPCID_GRN_FISH_S3 || NPC[B].Type == NPCID_RED_FISH_S3)) ||
-                                                                NPCIsAVine[NPC[B].Type]
+                                                                NPC[B]->IsAVine
                                                         ) && (Player[A].HoldingNPC != B)
                                                         )
                                                 {
@@ -3986,7 +3989,7 @@ void UpdatePlayer()
                                                         Player[A].Jump = 1;
                                                     }
 
-                                                    if(!(NPCIsAShell[NPC[B].Type] && NPC[B].CantHurtPlayer == A))
+                                                    if(!(NPC[B]->IsAShell && NPC[B].CantHurtPlayer == A))
                                                         NPCHit(B, 1, A); // NPC 'B' was jumped on '1' by player 'A'
                                                 }
                                             }
@@ -4004,24 +4007,24 @@ void UpdatePlayer()
 */
                                         // grab code
                                         if(
-                                            ((Player[A].CanGrabNPCs || NPCIsGrabbable[NPC[B].Type] || (NPC[B].Effect == 2 && !NPCIsABonus[NPC[B].Type])) && (NPC[B].Effect == 0 || NPC[B].Effect == 2)) ||
-                                             (NPCIsAShell[NPC[B].Type] && FreezeNPCs)
+                                            ((Player[A].CanGrabNPCs || NPC[B]->IsGrabbable || (NPC[B].Effect == 2 && !NPC[B]->IsABonus)) && (NPC[B].Effect == 0 || NPC[B].Effect == 2)) ||
+                                             (NPC[B]->IsAShell && FreezeNPCs)
                                         ) // GRAB EVERYTHING
                                         {
                                             if(Player[A].Controls.Run)
                                             {
                                                 if((HitSpot == 2 && Player[A].Direction == -1) ||
                                                    (HitSpot == 4 && Player[A].Direction == 1) ||
-                                                   (NPC[B].Type == NPCID_CANNONITEM || NPC[B].Type == NPCID_TOOTHYPIPE || NPC[B].Effect == 2 || (NPCIsVeggie[NPC[B].Type] && NPC[B].CantHurtPlayer != A)))
+                                                   (NPC[B].Type == NPCID_CANNONITEM || NPC[B].Type == NPCID_TOOTHYPIPE || NPC[B].Effect == 2 || (NPCIsVeggie(NPC[B]) && NPC[B].CantHurtPlayer != A)))
                                                 {
                                                     if(Player[A].HoldingNPC == 0)
                                                     {
-                                                        if(!NPCIsAShell[NPC[B].Type] || Player[A].Character >= 3)
+                                                        if(!NPC[B]->IsAShell || Player[A].Character >= 3)
                                                         {
-                                                            if(NPCIsVeggie[NPC[B].Type])
-                                                                PlaySound(SFX_Grab2);
+                                                            if(NPCIsVeggie(NPC[B]))
+                                                                PlaySoundSpatial(SFX_Grab2, Player[A].Location);
                                                             else
-                                                                PlaySound(SFX_Grab);
+                                                                PlaySoundSpatial(SFX_Grab, Player[A].Location);
                                                         }
                                                         if(Player[A].Character <= 2)
                                                             UnDuck(Player[A]);
@@ -4035,14 +4038,14 @@ void UpdatePlayer()
                                                 }
                                             }
                                         }
-                                        if(NPCIsAShell[NPC[B].Type] || (NPC[B].Type == NPCID_SLIDE_BLOCK && NPC[B].Special == 1)) // Turtle shell
+                                        if(NPC[B]->IsAShell || (NPC[B].Type == NPCID_SLIDE_BLOCK && NPC[B].Special == 1)) // Turtle shell
                                         {
                                             if(NPC[B].Location.SpeedX == 0 && NPC[B].Location.SpeedY >= 0) // Shell is not moving
                                             {
                                                 if(((Player[A].Controls.Run && Player[A].HoldingNPC == 0) || Player[A].HoldingNPC == B) && NPC[B].CantHurtPlayer != A) // Grab the shell
                                                 {
                                                     if(Player[A].Character >= 3)
-                                                        PlaySound(SFX_Grab);
+                                                        PlaySoundSpatial(SFX_Grab, Player[A].Location);
                                                     else
                                                         UnDuck(Player[A]);
                                                     Player[A].HoldingNPC = B;
@@ -4083,7 +4086,7 @@ void UpdatePlayer()
                                                 }
                                             }
                                         }
-                                        else if(NPCIsABonus[NPC[B].Type]) // Bonus
+                                        else if(NPC[B]->IsABonus) // Bonus
                                             TouchBonus(A, B);
                                         else // Everything else
                                         {
@@ -4097,7 +4100,7 @@ void UpdatePlayer()
                                                     NPCHit(B, 1, A);
                                                 }
                                             }
-                                            else if(NPC[B].CantHurtPlayer != A && !NPCWontHurt[NPC[B].Type])
+                                            else if(NPC[B].CantHurtPlayer != A && !NPC[B]->WontHurt)
                                             {
                                                 if(!(NPC[B].Type == NPCID_BULLET && NPC[B].Projectile != 0))
                                                 {
@@ -4107,7 +4110,7 @@ void UpdatePlayer()
                                                     {
                                                         if(NPC[B].Effect != 2)
                                                         {
-                                                            if(Player[A].SlideKill && !NPCJumpHurt[NPC[B].Type])
+                                                            if(Player[A].SlideKill && !NPC[B]->JumpHurt)
                                                                 NPCHit(B, 3, B);
                                                             if(NPC[B].Killed == 0)
                                                             {
@@ -4119,14 +4122,14 @@ void UpdatePlayer()
                                                                 }
                                                             }
                                                             else
-                                                                MoreScore(NPCScore[NPC[B].Type], NPC[B].Location, Player[A].Multiplier);
+                                                                MoreScore(NPC[B]->Score, NPC[B].Location, Player[A].Multiplier);
                                                         }
                                                     }
                                                 }
                                             }
 
                                             // this is for NPC that physically push the player
-                                            if(NPCMovesPlayer[NPC[B].Type] && NPC[B].Projectile == 0 && Player[A].HoldingNPC != B &&
+                                            if(NPC[B]->MovesPlayer && NPC[B].Projectile == 0 && Player[A].HoldingNPC != B &&
                                                !(Player[A].Mount == 2 && (NPC[B].Type == NPCID_KEY || NPC[B].Type == NPCID_COIN_SWITCH)) &&
                                                !ShadowMode && NPC[B].Effect != 2)
                                             {
@@ -4158,7 +4161,7 @@ void UpdatePlayer()
                                                         }
                                                     }
 
-                                                    PlaySound(SFX_BlockHit);
+                                                    PlaySoundSpatial(SFX_BlockHit, Player[A].Location);
                                                     Player[A].Jump = 0;
                                                     if(Player[A].Mount == 2)
                                                         Player[A].Location.SpeedY += 2;
@@ -4384,7 +4387,7 @@ void UpdatePlayer()
                     B = tempBlockHit[2];
                 if(NPC[B].Effect == 2)
                     B = 0;
-                if(NPC[B].Projectile != 0 && NPCIsVeggie[NPC[B].Type])
+                if(NPC[B].Projectile != 0 && NPCIsVeggie(NPC[B]))
                     B = 0;
 
                 // B is the number of the NPC that the player is standing on
@@ -4487,7 +4490,7 @@ void UpdatePlayer()
                         if(g_compatibility.fix_char5_vehicle_climb && Player[A].Fairy) // Avoid the mortal glitch
                         {
                             Player[A].Fairy = false;
-                            PlaySound(SFX_HeroFairy);
+                            PlaySoundSpatial(SFX_HeroFairy, Player[A].Location);
                             NewEffect(EFFID_SMOKE_S5, Player[A].Location);
                         }
                         Player[A].Location = NPC[B].Location;
@@ -4496,7 +4499,7 @@ void UpdatePlayer()
                         NPCQueues::Killed.push_back(B);
                         Player[A].HoldingNPC = 0;
                         Player[A].StandingOnNPC = 0;
-                        PlaySound(SFX_Stomp);
+                        PlaySoundSpatial(SFX_Stomp, Player[A].Location);
                         for(C = 1; C <= numPlayers; ++C)
                         {
                             if(Player[C].StandingOnNPC == B)
@@ -4507,7 +4510,7 @@ void UpdatePlayer()
                     {
                         Player[A].StandingOnNPC = 0;
                         if(Player[A].Location.SpeedY > 4 + NPC[B].Location.SpeedY)
-                            PlaySound(SFX_Stone);
+                            PlaySoundSpatial(SFX_Stone, Player[A].Location);
                         Player[A].Location.SpeedY = NPC[B].Location.SpeedY;
                     }
 
@@ -4709,7 +4712,7 @@ void UpdatePlayer()
                 if(Player[A].Location.Y > level[Player[A].Section].Height + 64)
                     PlayerDead(A);
 
-                if(!NPCIsAShell[NPC[Player[A].StandingOnNPC].Type])
+                if(!NPC[Player[A].StandingOnNPC]->IsAShell)
                     Player[A].ShellSurf = false;
 
                 PlayerGrabCode(A, DontResetGrabTime); // Player holding NPC code **GRAB CODE**

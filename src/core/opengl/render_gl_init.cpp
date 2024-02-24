@@ -32,6 +32,7 @@
 #include "globals.h"
 #include "video.h"
 
+#include "core/render.h"
 #include "core/opengl/render_gl.h"
 #include "core/opengl/gl_shader_translator.h"
 
@@ -59,17 +60,35 @@ void load_gles3_symbols()
 
 
 #ifdef RENDERGL_HAS_DEBUG
+
+static std::map<GLuint, uint64_t> s_gl_message_counts;
+
 static void APIENTRY s_HandleGLDebugMessage(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char *message, const void *userParam)
 {
+    auto& count = s_gl_message_counts[id];
+
+    if(count >= 3)
+        return;
+
+    s_gl_message_counts[id]++;
+
+    auto log_call = pLogDebug;
+    if(type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR || severity == GL_DEBUG_SEVERITY_HIGH)
+        log_call = pLogWarning;
+    else if(type == GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR || type == GL_DEBUG_TYPE_PORTABILITY || type == GL_DEBUG_TYPE_PERFORMANCE || severity == GL_DEBUG_SEVERITY_MEDIUM)
+        log_call = pLogInfo;
+
     UNUSED(source);
-    UNUSED(type);
     UNUSED(id);
-    UNUSED(severity);
     UNUSED(length);
     UNUSED(userParam);
 
-    pLogWarning("Got GL error %s", message);
+    log_call("Render GL: got debug message \"%s\"", message);
+
+    if(count == 3)
+        log_call("Render GL: (Ignoring future debug messages of this type.)");
 }
+
 #endif
 
 void RenderGL::try_init_gl(SDL_GLContext& context, SDL_Window* window, GLint profile, GLint majver, GLint minver, RenderMode_t mode)
@@ -103,7 +122,7 @@ bool RenderGL::initOpenGL(const CmdLineSetup_t &setup)
     m_gContext = nullptr;
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
     // user request sequence
 
@@ -423,8 +442,8 @@ bool RenderGL::initShaders()
         );
 
         // will assume that this is stored in the GLProgramObject's uniform slot 0 later
-        StdPictureLoad null_load;
-        m_distance_field_2_program.register_uniform("u_step_size", null_load);
+        StdPicture_Sub null_sub;
+        m_distance_field_2_program.register_uniform("u_step_size", null_sub);
 
         dumpFullFile(output_contents, (AppPath + "/graphics/shaders/lighting.frag").c_str());
         if(!output_contents.empty())
@@ -494,7 +513,7 @@ void RenderGL::createFramebuffer(BufferIndex_t buffer)
     if(buffer == BUFFER_DEPTH_READ)
     {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16,
-            ScreenW * scale_factor, ScreenH * scale_factor,
+            XRender::TargetW * scale_factor, XRender::TargetH * scale_factor,
             0, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, nullptr);
     }
     else if(buffer == BUFFER_LIGHTING)
@@ -507,26 +526,26 @@ void RenderGL::createFramebuffer(BufferIndex_t buffer)
         {
             pLogInfo("Attempting to initialize lighting buffer with RGBA16F using EXT_color_buffer_float...");
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F,
-                ScreenW * scale_factor, ScreenH * scale_factor,
+                XRender::TargetW * scale_factor, XRender::TargetH * scale_factor,
                 0, GL_RGBA, GL_FLOAT, nullptr);
         }
         else
         {
             pLogInfo("Initializing lighting buffer with RGB8...");
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                ScreenW * scale_factor, ScreenH * scale_factor,
+                XRender::TargetW * scale_factor, XRender::TargetH * scale_factor,
                 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
         }
 #else // #ifdef __EMSCRIPTEN__
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F,
-            ScreenW * scale_factor, ScreenH * scale_factor,
+            XRender::TargetW * scale_factor, XRender::TargetH * scale_factor,
             0, GL_RGB, GL_FLOAT, nullptr);
 #endif
     }
     else
     {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-            ScreenW * scale_factor, ScreenH * scale_factor,
+            XRender::TargetW * scale_factor, XRender::TargetH * scale_factor,
             0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
     }
 
@@ -555,7 +574,7 @@ void RenderGL::createFramebuffer(BufferIndex_t buffer)
             glBindTexture(GL_TEXTURE_2D, m_game_depth_texture);
 
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16,
-                ScreenW * scale_factor, ScreenH * scale_factor,
+                XRender::TargetW * scale_factor, XRender::TargetH * scale_factor,
                 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, nullptr);
 
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -568,7 +587,7 @@ void RenderGL::createFramebuffer(BufferIndex_t buffer)
         {
             glGenRenderbuffers(1, &m_game_depth_rb);
             glBindRenderbuffer(GL_RENDERBUFFER, m_game_depth_rb);
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, ScreenW * scale_factor, ScreenH * scale_factor);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, XRender::TargetW * scale_factor, XRender::TargetH * scale_factor);
             glBindRenderbuffer(GL_RENDERBUFFER, 0);
         }
 

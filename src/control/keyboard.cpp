@@ -75,6 +75,21 @@ bool InputMethod_Keyboard::Update(int player, Controls_t& c, CursorControls_t& m
     if(k->m_directText && GamePaused == PauseCode::TextEntry)
         return true;
 
+    // consume parent's precise scrolling
+    if(k->m_scroll_x_precise < 0)
+        e.ScrollLeft += -k->m_scroll_x_precise * 32.0;
+    else if(k->m_scroll_x_precise > 0)
+        e.ScrollRight += k->m_scroll_x_precise * 32.0;
+
+    if(k->m_scroll_y_precise < 0)
+        e.ScrollUp += -k->m_scroll_y_precise * 32.0;
+    else if(k->m_scroll_y_precise > 0)
+        e.ScrollDown += k->m_scroll_y_precise * 32.0;
+
+    k->m_scroll_x_precise = 0;
+    k->m_scroll_y_precise = 0;
+
+    // check for alt press (disables some keys)
     bool altPressed = (k->m_keyboardState[SDL_SCANCODE_LALT] ||
                        k->m_keyboardState[SDL_SCANCODE_RALT] ||
                        k->m_keyboardState[SDL_SCANCODE_LCTRL] ||
@@ -189,11 +204,13 @@ bool InputMethod_Keyboard::Update(int player, Controls_t& c, CursorControls_t& m
     // Cursor control (UDLR)
     if(cursor[0] || cursor[1] || cursor[2] || cursor[3])
     {
+        bool edge_scroll = LevelEditor && !MagicHand;
+
         if(m.X < 0)
-            m.X = ScreenW / 2;
+            m.X = XRender::TargetW / 2;
 
         if(m.Y < 0)
-            m.Y = ScreenH / 2;
+            m.Y = XRender::TargetH / 2;
 
         if(cursor[3])
             m.X += 16.0;
@@ -208,14 +225,34 @@ bool InputMethod_Keyboard::Update(int player, Controls_t& c, CursorControls_t& m
             m.Y -= 16.0;
 
         if(m.X < 0)
+        {
+            if(edge_scroll)
+                e.ScrollLeft += -m.X;
+
             m.X = 0;
-        else if(m.X >= ScreenW)
-            m.X = ScreenW - 1;
+        }
+        else if(m.X >= XRender::TargetW)
+        {
+            if(edge_scroll)
+                e.ScrollRight += m.X - (XRender::TargetW - 1);
+
+            m.X = XRender::TargetW - 1;
+        }
 
         if(m.Y < 0)
+        {
+            if(edge_scroll)
+                e.ScrollUp += -m.Y;
+
             m.Y = 0;
-        else if(m.Y >= ScreenH)
-            m.Y = ScreenH - 1;
+        }
+        else if(m.Y >= XRender::TargetH)
+        {
+            if(edge_scroll)
+                e.ScrollDown += m.Y - (XRender::TargetH - 1);
+
+            m.Y = XRender::TargetH - 1;
+        }
 
         m.Move = true;
     }
@@ -816,6 +853,17 @@ void InputMethodType_Keyboard::UpdateControlsPost()
         int window_x, window_y;
         Uint32 buttons = SDL_GetMouseState(&window_x, &window_y);
 
+        static int last_window_x = -1, last_window_y = -1;
+        bool allow_move = false;
+
+        // only allow move if both the window coordinates and the gamespace coordinates changed (prevents fake move when resolution changes)
+        if(last_window_x != window_x || last_window_y != window_y)
+        {
+            last_window_x = window_x;
+            last_window_y = window_y;
+            allow_move = true;
+        }
+
         SDL_Point p;
         XRender::mapToScreen(window_x, window_y, &p.x, &p.y);
         static SDL_Point last_p;
@@ -824,7 +872,10 @@ void InputMethodType_Keyboard::UpdateControlsPost()
            p.y - last_p.y <= -1 || p.y - last_p.y >= 1)
         {
             last_p = p;
-            SharedCursor.Move = true;
+
+            if(allow_move)
+                SharedCursor.Move = true;
+
             SharedCursor.X = p.x;
             SharedCursor.Y = p.y;
         }
@@ -1314,6 +1365,23 @@ bool InputMethodType_Keyboard::ConsumeEvent(const SDL_Event* ev)
         {
             // scrolling up results in traversing items backwards
             this->m_scroll -= ev->wheel.y;
+
+#if SDL_VERSION_ATLEAST(2,0,18)
+            SDL_version ver;
+            SDL_GetVersion(&ver);
+
+            if(int(ver.major) * 0x10000 + int(ver.minor) * 0x100 + int(ver.patch) >= 2 * 0x10000 + 0 * 0x100 + 18)
+            {
+                this->m_scroll_x_precise += ev->wheel.preciseX;
+                this->m_scroll_y_precise -= ev->wheel.preciseY;
+            }
+            else
+#endif
+            {
+                this->m_scroll_x_precise += ev->wheel.x;
+                this->m_scroll_y_precise -= ev->wheel.y;
+            }
+
             return true;
         }
         else

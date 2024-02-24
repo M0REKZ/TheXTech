@@ -24,6 +24,7 @@
 #include "npc.h"
 #include "npc_id.h"
 #include "eff_id.h"
+#include "npc_traits.h"
 #include "sound.h"
 #include "game_main.h"
 #include "collision.h"
@@ -61,9 +62,9 @@ void UpdateEffects()
                     numNPCs++;
                     auto &nn = NPC[numNPCs];
                     nn = NPC_t();
-                    nn.Type = e.NewNpc;
-                    nn.Location.Height = NPCHeight[nn.Type];
-                    nn.Location.Width = NPCWidth[nn.Type];
+                    nn.Type = NPCID(e.NewNpc);
+                    nn.Location.Height = nn->THeight;
+                    nn.Location.Width = nn->TWidth;
                     nn.Location.X = e.Location.X + e.Location.Width / 2.0 - NPC[numNPCs].Location.Width / 2.0;
                     nn.Location.Y = e.Location.Y - 1;
                     nn.Location.SpeedY = -6;
@@ -72,7 +73,7 @@ void UpdateEffects()
                     nn.Frame = 0;
                     syncLayers_NPC(numNPCs);
                     CheckSectionNPC(numNPCs);
-                    PlaySound(SFX_BossBeat);
+                    PlaySoundSpatial(SFX_BossBeat, e.Location);
                 }
             }
         }
@@ -175,10 +176,10 @@ void UpdateEffects()
                 else if(e.Life == 52)
                     e.Location.SpeedY = -14;
             }
-            else if(!HasSound(SFX_MagicBossShell) && e.Life == 100) // Old sound
+            else if(e.Life == 100) // Old sound
             {
                 e.Location.SpeedY = -8;
-                PlaySound(SFX_SickBossKilled);
+                PlaySoundSpatial(SFX_SickBossKilled, e.Location);
             }
         }
         else if(e.Type == EFFID_WATER_SPLASH) // Splash
@@ -712,7 +713,7 @@ void UpdateEffects()
                 e.Life = 0;
                 if(!LevelEditor && e.NewNpc != 96)
                 {
-                    if(NPCIsYoshi[e.NewNpc])
+                    if(NPCIsYoshi(e.NewNpc))
                         NewEffect(EFFID_PET_BIRTH, e.Location, 1, static_cast<float>(e.NewNpc));
                     else if(e.NewNpc > 0)
                     {
@@ -723,22 +724,22 @@ void UpdateEffects()
                         nn.Active = true;
                         nn.TimeLeft = 100;
                         nn.Direction = 0;
-                        nn.Type = e.NewNpc;
-                        nn.Location.Height = NPCHeight[nn.Type];
-                        nn.Location.Width = NPCWidth[nn.Type];
+                        nn.Type = NPCID(e.NewNpc);
+                        nn.Location.Height = nn->THeight;
+                        nn.Location.Width = nn->TWidth;
                         nn.Location.Y += 32 - nn.Location.Height;
                         nn.Location.X += -nn.Location.Width / 2.0 + 16;
 
                         if(nn.Type == NPCID_LEAF_POWER)
                             nn.Location.SpeedY = -6;
 
-                        if(NPCIsCheep[e.NewNpc] || NPCIsAParaTroopa[e.NewNpc] || e.NewNpc == NPCID_FIRE_CHAIN)
+                        if(NPCTraits[e.NewNpc].IsFish || NPCIsAParaTroopa(e.NewNpc) || e.NewNpc == NPCID_FIRE_CHAIN)
                         {
                             nn.Special = static_cast<double>(e.NewNpcSpecial);
                             nn.DefaultSpecial = static_cast<int>(e.NewNpcSpecial);
                         }
 
-                        if(e.NewNpc == NPCID_STAR_EXIT || e.NewNpc == NPCID_STAR_COLLECT)
+                        if(e.NewNpc == NPCID_STAR_EXIT || e.NewNpc == NPCID_STAR_COLLECT || e.NewNpc == NPCID_MEDAL)
                             nn.Variant = e.NewNpcSpecial;
 
                         syncLayers_NPC(numNPCs);
@@ -784,9 +785,9 @@ void UpdateEffects()
                 nn.Active = true;
                 nn.TimeLeft = 100;
                 nn.Direction = 1;
-                nn.Type = e.NewNpc;
-                nn.Location.Height = NPCHeight[nn.Type];
-                nn.Location.Width = NPCWidth[nn.Type];
+                nn.Type = NPCID(e.NewNpc);
+                nn.Location.Height = nn->THeight;
+                nn.Location.Width = nn->TWidth;
                 syncLayers_NPC(numNPCs);
                 CheckSectionNPC(numNPCs);
             }
@@ -887,7 +888,7 @@ void NewEffect(int A, const Location_t &Location, float Direction, int NewNpc, b
         ne.Type = A;
         ne.Location.X = Location.X + Location.Width / 2.0 - ne.Location.Width / 2.0;
         ne.Location.Y = Location.Y + Location.Height - ne.Location.Height;
-        PlaySound(SFX_MagicBossKilled);
+        PlaySoundSpatial(SFX_MagicBossKilled, Location);
     }
     else if(A == 104) // Blaarg eyes
     {
@@ -935,12 +936,12 @@ void NewEffect(int A, const Location_t &Location, float Direction, int NewNpc, b
         if(A == 56)
         {
             if(ne.NewNpc != 0 /*&& ne.NewNpc != 96*/) // never 96, because of condition above that replaces 96 with zero
-                PlaySound(SFX_PetBirth);
+                PlaySoundSpatial(SFX_PetBirth, Location);
             else
-                PlaySound(SFX_Smash);
+                PlaySoundSpatial(SFX_Smash, Location);
         }
         else if(A == 58)
-            PlaySound(SFX_Pet);
+            PlaySoundSpatial(SFX_Pet, Location);
     }
     else if(A == 136) // Roto Disk
     {
@@ -1051,7 +1052,7 @@ void NewEffect(int A, const Location_t &Location, float Direction, int NewNpc, b
     }
     else if(A == 2 || A == 6 || A == 23 || A == 35 || A == 37 || A == 39 || A == 41 || A == 43 || A == 45 || A == 52 || A == 62 || A == 84 || A == 126) // Goomba smash effect
     {
-        PlaySound(SFX_Stomp); // Stomp sound
+        PlaySoundSpatial(SFX_Stomp, Location); // Stomp sound
         numEffects++;
         auto &ne = Effect[numEffects];
         ne.Shadow = Shadow;
@@ -1064,11 +1065,13 @@ void NewEffect(int A, const Location_t &Location, float Direction, int NewNpc, b
         ne.Frame = 0;
         ne.Life = 20;
         ne.Type = A;
+
         if(A == 45)
         {
             ne.Location.Height = 46;
             ne.Location.Width = 48;
         }
+
         if(A == 84)
         {
             if(Direction == 1)
@@ -1878,12 +1881,15 @@ void NewEffect(int A, const Location_t &Location, float Direction, int NewNpc, b
 
         ne.Location.SpeedY = Location.SpeedY;
         ne.Location.SpeedX = -Location.SpeedX;
+
         if(ne.Location.SpeedX != 0 && ne.Location.SpeedX > -2 && ne.Location.SpeedX < 2)
             ne.Location.SpeedX = 2 * -Direction;
+
         if(int(Direction) == -1)
             ne.Frame = 0;
         else
             ne.Frame = 1;
+
         ne.Life = 120;
         ne.Type = A;
     }
@@ -1902,7 +1908,7 @@ void NewEffect(int A, const Location_t &Location, float Direction, int NewNpc, b
         ne.Location.SpeedX = 3 * -Direction;
         ne.Life = 200;
         ne.Type = A;
-        PlaySound(SFX_FireBossKilled);
+        PlaySoundSpatial(SFX_FireBossKilled, Location);
     }
 }
 

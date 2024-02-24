@@ -42,6 +42,9 @@ void SetupPhysics();
 
 void initAll();
 
+//! NEW: (re)load all file-based assets from the current asset pack directory
+void MainLoadAll(bool reload);
+
 int GameMain(const CmdLineSetup_t &setup);
 //! Set up object sizes and frame offsets for blocks/npcs/effects
 void SetupVars();
@@ -95,6 +98,9 @@ int PauseGame(PauseCode code, int plr = 0);
 
 void OpenConfig_preSetup();
 
+// reload recent episodes from config (used when asset pack changes)
+void ConfigReloadRecentEpisodes();
+
 void OpenConfig();
 
 void SaveConfig();
@@ -115,6 +121,10 @@ void AddCredit(const std::string& newCredit);
 // calcualtes scores based on the multiplyer and how much the NPC is worth
 void MoreScore(int addScore, const Location_t &Loc);
 void MoreScore(int addScore, const Location_t &Loc, vbint_t &Multiplier);
+
+// NEW: convenience hook for when a player has collected 100 coins
+void Got100Coins();
+
 // sets up player frame offsets so they are displayed correctly on the screen
 void SetupPlayerFrames();
 

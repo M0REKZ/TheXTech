@@ -113,6 +113,9 @@ struct EditorContent
     std::string wordHeight;
     std::string wordWidth;
 
+    std::string labelSortLayer;
+    std::string labelSortOffset;
+
     std::string phraseTextOf;
     std::string phraseSectionIndex;
     std::string phraseRadiusIndex;
@@ -304,10 +307,12 @@ struct EditorContent
 
     std::string fileConvertFeatureNPCVariant;
     std::string fileConvertFeatureBlockForceSmashable;
+    std::string fileConvertFeatureBgoOrder;
 
     std::string fileConvertFeatureCustomWorldMusic;
     std::string fileConvertFeatureWorldStarDisplay;
     std::string fileConvertFeatureLevelStarDisplay;
+    std::string fileConvertFeatureWorldMapSections;
 
     std::string browserNewFile;
     std::string browserSaveFile;

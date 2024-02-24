@@ -33,6 +33,8 @@
 #include "../config.h"
 #include "../layers.h"
 
+#include "npc_traits.h"
+
 #include "main/level_medals.h"
 
 #include "npc/npc_queues.h"
@@ -63,7 +65,7 @@ static bool doPlayGrowWithGotItem()
 static void s_PowerupScore(NPCRef_t n)
 {
     if(g_compatibility.custom_powerup_collect_score)
-        MoreScore(NPCScore[n->Type], n->Location);
+        MoreScore((*n)->Score, n->Location);
     else
         MoreScore(6, n->Location);
 }
@@ -85,23 +87,23 @@ void DropBonus(int A)
     // is player a clone?
     if(g_ClonedPlayerMode && A != 1)
     {
-        Player[A].HeldBonus = 0;
+        Player[A].HeldBonus = NPCID(0);
         return;
     }
 
     // is player not meant to have a bonus?
     if(Player[A].Character == 3 || Player[A].Character == 4)
     {
-        Player[A].HeldBonus = 0;
+        Player[A].HeldBonus = NPCID(0);
         return;
     }
 
     // drop the bonus!
-    PlaySound(SFX_DropItem);
+    PlaySoundSpatial(SFX_DropItem, plr.Location);
     numNPCs++;
     NPC[numNPCs] = NPC_t();
     NPC[numNPCs].Type = Player[A].HeldBonus;
-    NPC[numNPCs].Location.Width = NPCWidth[Player[A].HeldBonus];
+    NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
     NPC[numNPCs].Location.Height = 32;
 
     // need to find a position to place the bonus -- look for ths HUD
@@ -155,7 +157,7 @@ void DropBonus(int A)
     // finish initializing the NPC
     NPC[numNPCs].Location.SpeedX = 0;
     NPC[numNPCs].Location.SpeedY = 0;
-    NPC[numNPCs].Effect = 2;
+    NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
     NPC[numNPCs].Effect2 = 1;
     NPC[numNPCs].Active = true;
     NPC[numNPCs].TimeLeft = 200;
@@ -163,7 +165,7 @@ void DropBonus(int A)
     CheckSectionNPC(numNPCs);
 
     // erase bonus
-    Player[A].HeldBonus = 0;
+    Player[A].HeldBonus = NPCID(0);
 }
 
 void CheckAfterStarTake(bool many)
@@ -196,11 +198,11 @@ void TouchBonus(int A, int B)
 {
     int C = 0;
     // int D = 0;
-    int toadBool = 0;
+    NPCID toadBool = NPCID(0);
     bool tempBool = false;
     Location_t tempLocation;
 
-    if(NPC[B].CantHurtPlayer != A || (NPCIsACoin[NPC[B].Type] && Player[A].HoldingNPC != B && NPC[B].Killed == 0))
+    if(NPC[B].CantHurtPlayer != A || (NPC[B]->IsACoin && Player[A].HoldingNPC != B && NPC[B].Killed == 0))
     {
         //        if(nPlay.Online == true && nPlay.MySlot + 1 == A)
         //            Netplay::sendData "1k" + std::to_string(A) + "|" + std::to_string(B) + "|" + NPC[B].Type + LB;
@@ -245,7 +247,8 @@ void TouchBonus(int A, int B)
                     Player[2].Immune = 10;
                 NPC[B].Killed = 9;
                 NPCQueues::Killed.push_back(B);
-                PlaySound(SFX_BossBeat);
+                PlaySoundSpatial(SFX_BossBeat, Player[1].Location);
+                PlaySoundSpatial(SFX_BossBeat, Player[2].Location);
                 return;
             }
         }
@@ -265,7 +268,7 @@ void TouchBonus(int A, int B)
                     SizeCheck(Player[A]);
                     NewEffect(EFFID_SMOKE_S5, Player[A].Location);
                 }
-                PlaySound(SFX_HeroFairy);
+                PlaySoundSpatial(SFX_HeroFairy, NPC[B].Location);
                 Player[A].FairyTime = -1;
                 NPC[B].Killed = 9;
                 NPCQueues::Killed.push_back(B);
@@ -280,10 +283,10 @@ void TouchBonus(int A, int B)
         }
         if(NPC[B].Type == NPCID_TIMER_S3 && NPC[B].Effect != 2 && (Player[A].Character == 1 || Player[A].Character == 2)) // send the clock to the item container
         {
-            Player[A].HeldBonus = 248;
+            Player[A].HeldBonus = NPCID_TIMER_S3;
             NPC[B].Killed = 9;
             NPCQueues::Killed.push_back(B);
-            PlaySound(SFX_GotItem);
+            PlaySoundSpatial(SFX_GotItem, NPC[B].Location);
             return;
         }
         if(NPC[B].Type == NPCID_TIMER_S2 || NPC[B].Type == NPCID_TIMER_S3) // player touched the clock
@@ -305,7 +308,7 @@ void TouchBonus(int A, int B)
             SizeCheck(Player[A]);
             NPC[B].Killed = 9;
             NPCQueues::Killed.push_back(B);
-            PlaySound(SFX_Checkpoint);
+            PlaySoundSpatial(SFX_Checkpoint, NPC[B].Location);
             Checkpoint = FullFileName;
             Checkpoint_t cp;
             cp.id = Maths::iRound(NPC[B].Special);
@@ -327,7 +330,7 @@ void TouchBonus(int A, int B)
             NPCQueues::Killed.push_back(B);
             return;
         }
-        if(NPCIsToad[NPC[B].Type])
+        if(NPCIsToad(NPC[B]))
         {
             toadBool = NPC[B].Type;
             NPC[B].Type = NPCID_POWER_S3;
@@ -356,15 +359,15 @@ void TouchBonus(int A, int B)
                 Player[A].Effect = 1;
                 if(Player[A].Mount > 0)
                     UnDuck(Player[A]);
-                PlaySound(SFX_PlayerGrow);
+                PlaySoundSpatial(SFX_PlayerGrow, NPC[B].Location);
             }
             else if(NPC[B].Type == NPCID_POWER_S5)
-                PlaySound(SFX_HeroHeart);
+                PlaySoundSpatial(SFX_HeroHeart, NPC[B].Location);
             else
             {
                 if(doPlayGrowWithGotItem())
-                    PlaySound(SFX_PlayerGrow);
-                PlaySound(SFX_GotItem);
+                    PlaySoundSpatial(SFX_PlayerGrow, NPC[B].Location);
+                PlaySoundSpatial(SFX_GotItem, NPC[B].Location);
             }
             if(NPC[B].Effect != 2)
                 s_PowerupScore(B);
@@ -387,19 +390,19 @@ void TouchBonus(int A, int B)
                 if(Player[A].Mount > 0)
                     UnDuck(Player[A]);
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroItem);
+                    PlaySoundSpatial(SFX_HeroItem, NPC[B].Location);
                 else
-                    PlaySound(SFX_PlayerGrow);
+                    PlaySoundSpatial(SFX_PlayerGrow, NPC[B].Location);
             }
             else
             {
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroHeart);
+                    PlaySoundSpatial(SFX_HeroHeart, NPC[B].Location);
                 else
                 {
                     if(doPlayGrowWithGotItem())
-                        PlaySound(SFX_PlayerGrow);
-                    PlaySound(SFX_GotItem);
+                        PlaySoundSpatial(SFX_PlayerGrow, NPC[B].Location);
+                    PlaySoundSpatial(SFX_GotItem, NPC[B].Location);
                 }
             }
             if(NPC[B].Effect != 2)
@@ -424,19 +427,19 @@ void TouchBonus(int A, int B)
                 if(Player[A].Mount > 0)
                     UnDuck(Player[A]);
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroItem);
+                    PlaySoundSpatial(SFX_HeroItem, NPC[B].Location);
                 else
-                    PlaySound(SFX_PlayerGrow);
+                    PlaySoundSpatial(SFX_PlayerGrow, NPC[B].Location);
             }
             else
             {
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroHeart);
+                    PlaySoundSpatial(SFX_HeroHeart, NPC[B].Location);
                 else
                 {
                     if(doPlayGrowWithGotItem())
-                        PlaySound(SFX_PlayerGrow);
-                    PlaySound(SFX_GotItem);
+                        PlaySoundSpatial(SFX_PlayerGrow, NPC[B].Location);
+                    PlaySoundSpatial(SFX_GotItem, NPC[B].Location);
                 }
             }
             if(NPC[B].Effect != 2)
@@ -455,19 +458,19 @@ void TouchBonus(int A, int B)
                 if(Player[A].Mount > 0)
                     UnDuck(Player[A]);
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroItem);
+                    PlaySoundSpatial(SFX_HeroItem, NPC[B].Location);
                 else
-                    PlaySound(SFX_Transform);
+                    PlaySoundSpatial(SFX_Transform, NPC[B].Location);
             }
             else
             {
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroHeart);
+                    PlaySoundSpatial(SFX_HeroHeart, NPC[B].Location);
                 else
                 {
                     if(doPlayGrowWithGotItem())
-                        PlaySound(SFX_PlayerGrow);
-                    PlaySound(SFX_GotItem);
+                        PlaySoundSpatial(SFX_PlayerGrow, NPC[B].Location);
+                    PlaySoundSpatial(SFX_GotItem, NPC[B].Location);
                 }
             }
             if(NPC[B].Effect != 2)
@@ -486,19 +489,19 @@ void TouchBonus(int A, int B)
                 if(Player[A].Mount > 0)
                     UnDuck(Player[A]);
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroItem);
+                    PlaySoundSpatial(SFX_HeroItem, NPC[B].Location);
                 else
-                    PlaySound(SFX_Transform);
+                    PlaySoundSpatial(SFX_Transform, NPC[B].Location);
             }
             else
             {
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroHeart);
+                    PlaySoundSpatial(SFX_HeroHeart, NPC[B].Location);
                 else
                 {
                     if(doPlayGrowWithGotItem())
-                        PlaySound(SFX_PlayerGrow);
-                    PlaySound(SFX_GotItem);
+                        PlaySoundSpatial(SFX_PlayerGrow, NPC[B].Location);
+                    PlaySoundSpatial(SFX_GotItem, NPC[B].Location);
                 }
             }
             if(NPC[B].Effect != 2)
@@ -517,64 +520,60 @@ void TouchBonus(int A, int B)
                 if(Player[A].Mount > 0)
                     UnDuck(Player[A]);
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroItem);
+                    PlaySoundSpatial(SFX_HeroItem, NPC[B].Location);
                 else
-                    PlaySound(SFX_Transform);
+                    PlaySoundSpatial(SFX_Transform, NPC[B].Location);
             }
             else
             {
                 if(Player[A].Character == 5)
-                    PlaySound(SFX_HeroHeart);
+                    PlaySoundSpatial(SFX_HeroHeart, NPC[B].Location);
                 else
                 {
                     if(doPlayGrowWithGotItem())
-                        PlaySound(SFX_PlayerGrow);
-                    PlaySound(SFX_GotItem);
+                        PlaySoundSpatial(SFX_PlayerGrow, NPC[B].Location);
+                    PlaySoundSpatial(SFX_GotItem, NPC[B].Location);
                 }
             }
             if(NPC[B].Effect != 2)
                 s_PowerupScore(B);
         }
-        else if(NPCIsACoin[NPC[B].Type]) // Bonus is a coin
+        else if(NPC[B]->IsACoin) // Bonus is a coin
         {
             if(NPC[B].Type == NPCID_RING)
-                PlaySound(SFX_RingGet);
+                PlaySoundSpatial(SFX_RingGet, NPC[B].Location);
             else if(NPC[B].Type == NPCID_GEM_1 || NPC[B].Type == NPCID_GEM_5 || NPC[B].Type == NPCID_GEM_20)
-                PlaySound(SFX_HeroRupee);
+                PlaySoundSpatial(SFX_HeroRupee, NPC[B].Location);
             else if(NPC[B].Type != NPCID_MEDAL)
-                PlaySound(SFX_Coin);
+                PlaySoundSpatial(SFX_Coin, NPC[B].Location);
+
             if(NPC[B].Type == NPCID_GEM_5 || NPC[B].Type == NPCID_COIN_5)
                 Coins += 5;
             else if(NPC[B].Type == NPCID_GEM_20)
                 Coins += 20;
             else
                 Coins += 1;
+
             if(Coins >= 100)
-            {
-                if(Lives < 99)
-                {
-                    Lives += 1;
-                    PlaySound(SFX_1up);
-                    Coins -= 100;
-                }
-                else
-                    Coins = 99;
-            }
+                Got100Coins();
+
             if(NPC[B].Type == NPCID_MEDAL)
             {
-                PlaySound(SFX_MedalGet);
-                MoreScore(NPCScore[NPC[B].Type], NPC[B].Location);
-                NPCScore[274] += 1;
-                if(NPCScore[274] > 14)
-                    NPCScore[274] = 14;
+                PlaySoundSpatial(SFX_MedalGet, NPC[B].Location);
+                auto& medal_score = NPCTraits[NPC[B].Type].Score;
+                MoreScore(medal_score, NPC[B].Location);
+                medal_score += 1;
+                if(medal_score > 14)
+                    medal_score = 14;
 
                 g_curLevelMedals.get(NPC[B].Variant - 1);
             }
             else
                 MoreScore(1, NPC[B].Location);
+
             NewEffect(EFFID_COIN_COLLECT, NPC[B].Location);
         }
-        else if(NPCIsAnExit[NPC[B].Type] && LevelMacro == LEVELMACRO_OFF) // Level exit
+        else if(NPCIsAnExit(NPC[B]) && LevelMacro == LEVELMACRO_OFF) // Level exit
         {
             if(NPC[B].Type != NPCID_STAR_COLLECT)
             {
@@ -694,7 +693,7 @@ void TouchBonus(int A, int B)
                     PlaySound(SFX_GotStar);
                 }
                 else
-                    PlaySound(SFX_MedalGet);
+                    PlaySoundSpatial(SFX_MedalGet, NPC[B].Location);
             }
         }
         if(toadBool > 0)

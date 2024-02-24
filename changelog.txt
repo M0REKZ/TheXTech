@@ -17,12 +17,39 @@ Changelog for 1.3.7-dev
 -Added code "logicscreen" to view camera used by event logic NPCs (@ds-sloth)
 -Added backdrop for levels smaller than the screen at graphics/ui/Backdrop.png (@ds-sloth)
 -Added alternative format for world map frame with better support for various display resolutions (@ds-sloth)
+-Add ability to edit BGO sort layers and offset in the in-game editor (@ds-sloth)
+-Redesigned character select screen for multiplayer game start and player setup (@Savbyn, @ds-sloth)
+-Drop/add screen renamed to "Player Setup"
+-In modern gameplay, the main menu now has a single "Play Episode" item instead of separate 1P/2P items
+-COMPATIBILITY CHANGE: remove automatic version targeting for pre-SMBX 1.3 content (@ds-sloth)
+-Sounds now get quieter when they are further from the screen (@ds-sloth)
+-In non-compat modes, now allow negative lives instead of game over (@ds-sloth, @0lhi)
+-Game looks for asset packs in the assets/ subdirectory of the user and system directories (@ds-sloth)
+-Add ability to specify asset pack by ID in the command line (as well as by path) (@ds-sloth)
+-Add ability to switch asset pack at main menu screen by holding select button (@ds-sloth)
 
-Changelog for 1.3.6.4-dev
+Changelog for 1.3.6.5-dev
+-Fix TheXTech 1.3.6 bug where auto movement on the world map was not reset when switching episodes (@ds-sloth)
+-Fix TheXTech 1.3.6 bug where dropping a player at the world map removed their mount (@ds-sloth)
+-Fix TheXTech 1.3.6.4 editor bug where NPCs could not be erased from a battle level (@ds-sloth)
+-Fix vanilla bug where an incorrect frame gets shown when player attempts to enter the star-locked pipe, guarded by compat flag fix-visual-bugs (@Wohlstand)
+
+Changelog for 1.3.6.4
 -Use OpenGL as the default renderer on supported platforms ("sdl" may be used in config.ini or at at the command line to request the SDL2 renderer)
 -Add ability to edit battle levels using in-game editor (@ds-sloth)
 -Fix bug where it was not possible to return to the main menu from an invalid battle mode level (@ds-sloth)
 -Fix vanilla bug where P2 could not close message box during shared screen coop (@ds-sloth)
+-Changed credits font id to 5 for outlines. (@0lhi)
+-Fix Emscripten bug where worlds created in the editor would get lost on page refresh (@ds-sloth)
+-Remove option "osk-fill-screen"; this behavior is now used whenever a touchscreen is active (@ds-sloth)
+-Fix TheXTech 1.3.6.1 crash on activating a joystick with an empty SDL name (@ds-sloth)
+-Fixed the TheXTech 1.3.6.3's startup crash on some 32-bit Windows systems. (@Wohlstand)
+-Removed config option "editor-edge-scroll" (enable by default on gamepads) (@ds-sloth)
+-Add ability to scroll in editor using mouse wheel or touchpad (@ds-sloth)
+-Fix TheXTech 1.3.6.1 bug where bitmask GIFs would sometimes be rendered incorrectly (@ds-sloth)
+-Fix TheXTech 1.3.6 bug where the editor could occasionally crash when placing warps (@ds-sloth)
+-Fix TheXTech 1.3.6 bug where the editor could not set the level name (used in battle mode) (@ds-sloth)
+-Fix TheXTech 1.3.6.1 bug affecting debug builds where the editor could crash when erasing objects (@ds-sloth)
 
 Changelog for 1.3.6.3
 -Fixed a TheXTech 1.3.6.1 crash where object lookup table could not process items with negative size (@ds-sloth)

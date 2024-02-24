@@ -33,11 +33,13 @@
 #include "npc.h"
 #include "npc_id.h"
 #include "eff_id.h"
+#include "npc_traits.h"
 #include "player.h"
 #include "sorting.h"
 #include "layers.h"
 #include "compat.h"
 #include "editor.h"
+#include "game_main.h"
 
 #include "graphics/gfx_update.h"
 #include "npc/npc_queues.h"
@@ -49,7 +51,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
     // int tempPlayer = 0;
     // bool makeShroom = false; // if true make a mushroom
     int newBlock = 0; // what the block should turn into if anything
-    int C = 0;
+    // int C = 0;
 //    int B = 0;
     // Block_t blankBlock;
     int oldSpecial = 0; // previous .Special
@@ -111,9 +113,9 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                 // moved SwapCharacter logic into player.cpp
 
                 if(transform_to)
-                    SwapCharacter(whatPlayer, transform_to, false, true);
+                    SwapCharacter(whatPlayer, transform_to, true);
 
-                PlaySound(SFX_Transform);
+                PlaySoundSpatial(SFX_Transform, b.Location);
             }
             else
             {
@@ -175,16 +177,16 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
     }
 
 
-    if(Block[A].Type == 169)
+    if(b.Type == 169)
     {
-        PlaySound(SFX_PSwitch);
+        PlaySoundSpatial(SFX_PSwitch, b.Location);
         BeltDirection = -BeltDirection; // for the blet direction changing block
     }
 
 
     if(b.Type == 170) // smw switch blocks
     {
-        PlaySound(SFX_PSwitch);
+        PlaySoundSpatial(SFX_PSwitch, b.Location);
         for(auto B = 1; B <= numBlock; B++)
         {
             if(Block[B].Type == 171)
@@ -202,7 +204,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
 
     if(b.Type == 173) // smw switch blocks
     {
-        PlaySound(SFX_PSwitch);
+        PlaySoundSpatial(SFX_PSwitch, b.Location);
         for(auto B = 1; B <= numBlock; B++)
         {
             if(Block[B].Type == 174)
@@ -220,7 +222,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
 
     if(b.Type == 176) // smw switch blocks
     {
-        PlaySound(SFX_PSwitch);
+        PlaySoundSpatial(SFX_PSwitch, b.Location);
         for(auto B = 1; B <= numBlock; B++)
         {
             if(Block[B].Type == 177)
@@ -238,7 +240,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
 
     if(b.Type == 179) // smw switch blocks
     {
-        PlaySound(SFX_PSwitch);
+        PlaySoundSpatial(SFX_PSwitch, b.Location);
         for(auto B = 1; B <= numBlock; B++)
         {
             if(Block[B].Type == 180)
@@ -326,16 +328,16 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                             nn.Type = NPCID_GEM_5;
                         if(iRand(60) < 3)
                             nn.Type = NPCID_GEM_20;
-                        PlaySound(SFX_HeroRupee);
+                        PlaySoundSpatial(SFX_HeroRupee, b.Location);
                     }
                     else
                     {
-                        PlaySound(SFX_Coin);
+                        PlaySoundSpatial(SFX_Coin, b.Location);
                     }
 
                     auto &nLoc = nn.Location;
-                    nLoc.Width = NPCWidth[nn.Type];
-                    nLoc.Height = NPCHeight[nn.Type];
+                    nLoc.Width = nn->TWidth;
+                    nLoc.Height = nn->THeight;
                     nLoc.X = b.Location.X + b.Location.Width / 2.0 - nLoc.Width / 2.0;
                     nLoc.Y = b.Location.Y - nLoc.Height - 0.01;
                     nLoc.SpeedX = dRand() * 3 - 1.5;
@@ -360,19 +362,9 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
             {
                 Coins += 1;
                 if(Coins >= 100)
-                {
-                    if(Lives < 99)
-                    {
-                        Lives += 1;
-                        PlaySound(SFX_1up);
-                        Coins -= 100;
-                    }
-                    else
-                    {
-                        Coins = 99;
-                    }
-                }
-                PlaySound(SFX_Coin);
+                    Got100Coins();
+
+                PlaySoundSpatial(SFX_Coin, b.Location);
                 NewEffect(EFFID_COIN_BLOCK_S3, b.Location);
                 b.Special -= 1;
             }
@@ -421,15 +413,15 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
 #endif
                 nn.Type = NPCID_COIN_S2;
 
-                nn.Location.Width = NPCWidth[nn.Type];
-                nn.Location.Height = NPCHeight[nn.Type];
+                nn.Location.Width = nn->TWidth;
+                nn.Location.Height = nn->THeight;
                 nn.Location.X = b.Location.X + b.Location.Width / 2.0 - nn.Location.Width / 2.0;
                 nn.Location.Y = b.Location.Y - nn.Location.Height - 0.01;
                 nn.Location.SpeedX = dRand() * 3.0 - 1.5;
                 nn.Location.SpeedY = -(dRand() * 4) - 3;
                 nn.Special = 1;
                 nn.Immune = 20;
-                PlaySound(SFX_Coin);
+                PlaySoundSpatial(SFX_Coin, b.Location);
                 syncLayers_NPC(numNPCs);
                 CheckSectionNPC(numNPCs);
                 b.Special -= 1;
@@ -438,20 +430,9 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
             {
                 Coins += 1;
                 if(Coins >= 100)
-                {
-                    if(Lives < 99)
-                    {
-                        Lives += 1;
-                        PlaySound(SFX_1up);
-                        Coins -= 100;
-                    }
-                    else
-                    {
-                        Coins = 99;
-                    }
-                }
+                    Got100Coins();
 
-                PlaySound(SFX_Coin);
+                PlaySoundSpatial(SFX_Coin, b.Location);
                 NewEffect(EFFID_COIN_BLOCK_S3, b.Location);
                 b.Special -= 1;
             }
@@ -460,20 +441,9 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
         {
             Coins += 1;
             if(Coins >= 100)
-            {
-                if(Lives < 99)
-                {
-                    Lives++;
-                    PlaySound(SFX_1up);
-                    Coins -= 100;
-                }
-                else
-                {
-                    Coins = 99;
-                }
-            }
+                Got100Coins();
 
-            PlaySound(SFX_Coin);
+            PlaySoundSpatial(SFX_Coin, b.Location);
             NewEffect(EFFID_COIN_BLOCK_S3, b.Location);
             b.Special -= 1;
         }
@@ -494,9 +464,11 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
         // represents behavior for ancient 101 / 104 / 201 Special values (other ancient values replaced in OpenLevel)
         bool is_ancient = false;
 
+        NPCID C = NPCID_NULL;
+
         if(b.Special >= 1000)
         {
-            C = b.Special - 1000; // this finds the NPC type and puts in the variable C
+            C = NPCID(b.Special - 1000); // this finds the NPC type and puts in the variable C
         }
         else if(b.Special == 201)
         {
@@ -541,7 +513,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
         }
 
 #if 0 // Completely disable the DEAD the code that spawns the player
-        if(NPCIsABonus[C] && C != 169 && C != 170) // check to see if it should spawn a dead player
+        if(NPCIsABonus(C) && C != 169 && C != 170) // check to see if it should spawn a dead player
         {
             tempPlayer = CheckDead();
             if(g_ClonedPlayerMode)
@@ -569,7 +541,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
             bool player_gets_full = (whatPlayer > 0 && (Player[whatPlayer].State > 1 || Player[whatPlayer].Character == 5));
 
             // replacement index if full powerup should not be received
-            int replacement = C;
+            NPCID replacement = C;
 
             if(g_ClonedPlayerMode || BattleMode || player_gets_full)
             {
@@ -582,7 +554,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
             else if(C == NPCID_FIRE_POWER_S1)
                 replacement = NPCID_POWER_S1;
 
-            if(NPCIsYoshi[C])
+            if(NPCIsYoshi(C))
             {
                 nn.Type = NPCID_ITEM_POD;
                 nn.Special = C;
@@ -617,12 +589,12 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
 
             CharStuff(numNPCs);
 
-            // note: minor SMBX64 bug, should be NPCWidth[nn.Type]
-            nn.Location.Width = NPCWidth[C];
+            // note: minor SMBX64 bug, should be nn->TWidth
+            nn.Location.Width = NPCWidth(C);
 
             // bug from ancient 101 case
             if(is_ancient && C == NPCID_FODDER_S3)
-                nn.Location.Width = NPCWidth[NPCID_POWER_S3];
+                nn.Location.Width = NPCWidth(NPCID_POWER_S3);
 
             // Make block a bit smaller to allow player take a bonus easier (Redigit's idea)
             if(!is_ancient && fEqual(b.Location.Width, 32))
@@ -644,7 +616,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
             if(is_ancient && C == NPCID_GRN_BOOT)
                 nn.Direction = -1;
 
-            if(NPCIsYoshi[C]) // if the npc is pet then set the color of the pod
+            if(NPCIsYoshi(C)) // if the npc is pet then set the color of the pod
             {
                 if(C == NPCID_PET_BLUE)
                     nn.Frame = 1;
@@ -669,32 +641,32 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
                 if(is_ancient)
                     nn.Location.Y = b.Location.Y - 0.1;
 
-                if(NPCIsYoshi[C])
+                if(NPCIsYoshi(C))
                 {
-                    nn.Effect = 0;
+                    nn.Effect = NPCEFF_NORMAL;
                     nn.Location.Height = 32;
                     nn.Location.Y = b.Location.Y - 32;
                 }
                 else if(nn.Type == NPCID_LEAF_POWER)
                 {
-                    nn.Effect = 0;
+                    nn.Effect = NPCEFF_NORMAL;
                     nn.Location.Y = b.Location.Y - 32;
                     nn.Location.SpeedY = -6;
-                    nn.Location.Height = NPCHeight[C];
+                    nn.Location.Height = NPCHeight(C);
                     // PlaySound(SFX_ItemEmerge); // Don't play mushroom sound on leaf, like in original SMB3 (Redigit's comment)
                 }
                 else
                 {
-                    nn.Effect = 1;
+                    nn.Effect = NPCEFF_EMERGE_UP;
                     switch(C)
                     {
                     case NPCID_GRN_VINE_TOP_S3:
                     case NPCID_RED_VINE_TOP_S3:
                     case NPCID_GRN_VINE_TOP_S4:
-                        PlaySound(SFX_SproutVine);
+                        PlaySoundSpatial(SFX_SproutVine, b.Location);
                         break;
                     default:
-                        PlaySound(SFX_ItemEmerge);
+                        PlaySoundSpatial(SFX_ItemEmerge, b.Location);
                         break;
                     }
                 }
@@ -702,14 +674,14 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
             else
             {
                 nn.Location.Y = b.Location.Y + 4;
-                nn.Location.Height = NPCHeight[C];
+                nn.Location.Height = NPCHeight(C);
 
                 // hardcoded to 32 in ancient 101 / 104 / 201 cases
                 if(is_ancient)
                     nn.Location.Height = 32;
 
-                nn.Effect = 3;
-                PlaySound(SFX_ItemEmerge);
+                nn.Effect = NPCEFF_EMERGE_DOWN;
+                PlaySoundSpatial(SFX_ItemEmerge, b.Location);
             }
 
             nn.Effect2 = 0;
@@ -720,8 +692,8 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
             {
                 // the logic is the next clause didn't exist in ancient cases
             }
-            else if(NPCIsYoshi[nn.Type] ||
-               NPCIsBoot[nn.Type] || nn.Type == NPCID_POWER_S3 ||
+            else if(NPCIsYoshi(nn) ||
+               NPCIsBoot(nn) || nn.Type == NPCID_POWER_S3 ||
                nn.Type == NPCID_FIRE_POWER_S3 || nn.Type == NPCID_CANNONITEM ||
                nn.Type == NPCID_LIFE_S3 || nn.Type == NPCID_POISON ||
                nn.Type == NPCID_STATUE_POWER || nn.Type == NPCID_HEAVY_POWER ||
@@ -772,8 +744,8 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
         nn.Type = NPCID_COIN_S4;
         nn.Block = 89;
         nn.Location = b.Location;
-        nn.Location.Width = NPCWidth[nn.Type];
-        nn.Location.Height = NPCHeight[nn.Type];
+        nn.Location.Width = nn->TWidth;
+        nn.Location.Height = nn->THeight;
         nn.Location.X += (b.Location.Width - nn.Location.Width) / 2.0;
         nn.Location.Y -= 0.01;
         nn.DefaultLocation = nn.Location;
@@ -858,6 +830,8 @@ void KillBlock(int A, bool Splode)
     Block_t blankBlock;
     bool tempBool = false;
 
+    Block_t& b = Block[A];
+
     if(Block[A].Hidden)
         return;
 
@@ -867,11 +841,12 @@ void KillBlock(int A, bool Splode)
     if(Splode)
     {
         if(Block[A].Type == 526)
-            PlaySound(SFX_SMBlockHit);
+            PlaySoundSpatial(SFX_SMBlockHit, b.Location);
         else if(Block[A].Type == 186)
-            PlaySound(SFX_Fireworks);
+            PlaySoundSpatial(SFX_Fireworks, b.Location);
         else
-            PlaySound(SFX_BlockSmashed); // Block smashed
+            PlaySoundSpatial(SFX_BlockSmashed, b.Location); // Block smashed
+
         // Create the break effect
         if(Block[A].Type == 60)
             NewEffect(EFFID_BLU_BLOCK_SMASH, Block[A].Location);
@@ -1350,9 +1325,9 @@ void UpdateBlocks()
             {
                 if(NPC[B].Active)
                 {
-                    if(NPC[B].Killed == 0 && NPC[B].Effect == 0 && NPC[B].HoldingPlayer == 0 && (!NPCNoClipping[NPC[B].Type] || NPCIsACoin[NPC[B].Type]))
+                    if(NPC[B].Killed == 0 && NPC[B].Effect == 0 && NPC[B].HoldingPlayer == 0 && (!NPC[B]->NoClipping || NPC[B]->IsACoin))
                     {
-                        if(ib.ShakeY3 <= 0 || NPCIsACoin[NPC[B].Type])
+                        if(ib.ShakeY3 <= 0 || NPC[B]->IsACoin)
                         {
                             if(ShakeCollision(NPC[B].Location, ib.Location, ib.ShakeY3))
                             {
@@ -1390,7 +1365,7 @@ void UpdateBlocks()
                             {
                                 Player[B].Location.SpeedY = double(Physics.PlayerJumpVelocity);
                                 Player[B].StandUp = true;
-                                PlaySound(SFX_Stomp);
+                                PlaySoundSpatial(SFX_Stomp, Player[B].Location);
                             }
                             else
                             {
@@ -1398,7 +1373,7 @@ void UpdateBlocks()
                                 {
                                     Player[B].Location.SpeedY = double(Physics.PlayerJumpVelocity);
                                     Player[B].StandUp = true;
-                                    PlaySound(SFX_Stomp);
+                                    PlaySoundSpatial(SFX_Stomp, Player[B].Location);
                                 }
                             }
                         }
@@ -1444,7 +1419,12 @@ void UpdateBlocks()
         {
             StopMusic();
             StartMusic(-1);
-            PlaySound(SFX_PSwitch);
+
+            if(PSwitchPlayer >= 1 && PSwitchPlayer <= numPlayers)
+                PlaySoundSpatial(SFX_PSwitch, Player[PSwitchPlayer].Location);
+            else
+                PlaySound(SFX_PSwitch);
+
             PSwitch(true);
         }
 
@@ -1472,7 +1452,7 @@ void PSwitch(bool enabled)
     {
         for(A = 1; A <= numNPCs; A++)
         {
-            bool transform = NPCIsACoin[NPC[A].Type] && NPC[A].Block == 0 && !NPC[A].Hidden && NPC[A].Special == 0.0;
+            bool transform = NPC[A]->IsACoin && NPC[A].Block == 0 && !NPC[A].Hidden && NPC[A].Special == 0.0;
 
             if(NPC[A].Type == NPCID_MEDAL && g_compatibility.fix_special_coin_switch)
                 transform = false;
@@ -1536,7 +1516,7 @@ void PSwitch(bool enabled)
         }
 
         // sort them in reverse location order
-        if(CompatGetLevel() == 1 || CompatGetLevel() == 2)
+        if(g_compatibility.emulate_classic_block_order)
         {
             std::sort(PSwitchBlocks.begin(), PSwitchBlocks.end(),
                 [](BaseRef_t a, BaseRef_t b) {
@@ -1579,14 +1559,14 @@ void PSwitch(bool enabled)
                     nn.Location = Block[A].Location;
                     nn.Location.SpeedX = 0;
                     nn.Location.SpeedY = 0;
-                    nn.Location.Width = NPCWidth[nn.Type];
-                    nn.Location.Height = NPCHeight[nn.Type];
+                    nn.Location.Width = nn->TWidth;
+                    nn.Location.Height = nn->THeight;
                     nn.Location.X += (Block[A].Location.Width - nn.Location.Width) / 2.0;
                     nn.DefaultLocation = nn.Location;
                     nn.DefaultType = nn.Type;
 
                     // WARNING: this is new logic from #167. Check in case of any inconsistencies after Coin Switch is activated.
-                    if(NPCFrame[nn.Type] > 0)
+                    if(nn->TFrames > 0)
                     {
                         nn.Direction = 1;
                         nn.Frame = EditorNPCFrame(nn.Type, nn.Direction);
@@ -1605,7 +1585,7 @@ void PSwitch(bool enabled)
         PSwitchBlocks.resize(numConverted);
 
         // return them to reverse index order
-        if(CompatGetLevel() == 1 || CompatGetLevel() == 2)
+        if(g_compatibility.emulate_classic_block_order)
         {
             std::sort(PSwitchBlocks.begin(), PSwitchBlocks.end(),
                 [](BaseRef_t a, BaseRef_t b) {
@@ -1677,7 +1657,7 @@ void PSwitch(bool enabled)
         }
 
         // sort them in reverse location order
-        if(CompatGetLevel() == 1 || CompatGetLevel() == 2)
+        if(g_compatibility.emulate_classic_block_order)
         {
             std::sort(PSwitchBlocks.begin(), PSwitchBlocks.end(),
                 [](BaseRef_t a, BaseRef_t b) {
@@ -1708,14 +1688,14 @@ void PSwitch(bool enabled)
                     nn.Location = Block[A].Location;
                     nn.Location.SpeedX = 0;
                     nn.Location.SpeedY = 0;
-                    nn.Location.Width = NPCWidth[nn.Type];
-                    nn.Location.Height = NPCHeight[nn.Type];
+                    nn.Location.Width = nn->TWidth;
+                    nn.Location.Height = nn->THeight;
                     nn.Location.X += (Block[A].Location.Width - nn.Location.Width) / 2.0;
                     nn.DefaultLocation = nn.Location;
                     nn.DefaultType = nn.Type;
 
                     // WARNING: this is new logic from #167. Check in case of any inconsistencies after Coin Switch is activated.
-                    if(NPCFrame[nn.Type] > 0)
+                    if(nn->TFrames > 0)
                     {
                         nn.Direction = 1;
                         nn.Frame = EditorNPCFrame(nn.Type, nn.Direction);
@@ -1863,7 +1843,7 @@ void PowBlock()
             {
                 for(int A : treeNPCQuery(query_loc, SORTMODE_NONE))
                 {
-                    if(!NPC[A].Active && NPCIsACoin[NPC[A].Type])
+                    if(!NPC[A].Active && NPC[A]->IsACoin)
                     {
                         NPC[A].JustActivated = vscreen_Z;
 
@@ -1884,7 +1864,7 @@ void PowBlock()
     {
         if(NPC[A].Active)
         {
-            if(NPCIsACoin[NPC[A].Type])
+            if(NPC[A]->IsACoin)
             {
                 NPC[A].Special = 1;
                 NPC[A].Location.SpeedX = (dRand() * 1.0) - 0.5;

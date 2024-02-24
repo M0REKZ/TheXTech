@@ -73,6 +73,7 @@
 #include "main/game_strings.h"
 #include "main/translate.h"
 #include "main/record.h"
+#include "main/asset_pack.h"
 #include "core/render.h"
 #include "core/window.h"
 #include "core/events.h"
@@ -88,6 +89,7 @@
 #include "config.h"
 #include "main/screen_connect.h"
 #include "main/screen_quickreconnect.h"
+#include "main/screen_asset_pack.h"
 
 #include "main/level_medals.h"
 
@@ -114,6 +116,9 @@ static int loadingThread(void *waiter_ptr)
     LoaderUpdateDebugString("Translations");
     XLanguage::findLanguages(); // find present translations
     ReloadTranslations(); // load translations
+
+    LoaderUpdateDebugString("Asset packs");
+    GetAssetPacks();
 
     SetupPhysics(); // Setup Physics
     SetupGraphics(); // setup graphics
@@ -227,8 +232,7 @@ void MainLoadAll(bool reload)
         UnloadGFX(true);
         FontManager::quit();
 
-        if(!noSound)
-            PlayInitSound();
+        PlayInitSound();
     }
 
     LoaderInit();
@@ -274,6 +278,7 @@ void MainLoadAll(bool reload)
 
     Integrator::setGameName(g_gameInfo.title, g_gameInfo.statusIconName);
     XWindow::setTitle(g_gameInfo.titleWindow().c_str());
+    XWindow::updateWindowIcon();
 
     LoaderFinish();
 }
@@ -343,8 +348,8 @@ int GameMain(const CmdLineSetup_t &setup)
 //    Unload frmLoader
     gfxLoaderTestMode = setup.testLevelMode;
 
-    // TODO: check locations in search path
-    if(!GFX.load()) // Load UI graphics
+    // find asset pack and load required UI graphics
+    if(!InitUIAssetsFrom(setup.assetPack))
         return 1;
 
 //    If LevelEditor = False Then
@@ -392,7 +397,7 @@ int GameMain(const CmdLineSetup_t &setup)
 #endif
     XWindow::show(); // Don't show window until playing an initial sound
 
-    if(!noSound && !setup.testLevelMode)
+    if(!setup.testLevelMode)
         PlayInitSound();
 
 #ifdef THEXTECH_INTERPROC_SUPPORTED
@@ -490,7 +495,7 @@ int GameMain(const CmdLineSetup_t &setup)
                     numPlayers = 1;
 
                 for(int A = 1; A <= numCharacters; A++)
-                    blockCharacter[A] = SelectWorld[selWorld].blockChar[A];
+                    blockCharacter[A] = (g_forceCharacter) ? false : SelectWorld[selWorld].blockChar[A];
 
                 // prepare for StartEpisode(): set player characters
                 for(int i = 0; i < numPlayers; i++)
@@ -548,7 +553,7 @@ int GameMain(const CmdLineSetup_t &setup)
 
     do
     {
-        if(GameMenu || MagicHand || LevelEditor)
+        if(GameMenu || MagicHand || LevelEditor || ScreenAssetPack::g_LoopActive)
         {
             XWindow::setCursor(CURSOR_NONE);
             XWindow::showCursor(0);
@@ -560,7 +565,16 @@ int GameMain(const CmdLineSetup_t &setup)
         }
 
 
-        if(LevelEditor) // Load the level editor
+        if(ScreenAssetPack::g_LoopActive)
+        {
+            // Run the frame-loop
+            runFrameLoop(&ScreenAssetPack::Loop,
+                         nullptr,
+                        []()->bool{ return ScreenAssetPack::g_LoopActive;}, nullptr,
+                        nullptr,
+                        nullptr);
+        }
+        else if(LevelEditor) // Load the level editor
         {
             // if(resChanged)
             //     ChangeScreen();
@@ -677,14 +691,14 @@ int GameMain(const CmdLineSetup_t &setup)
                     p.MountType = iRand(8) + 1;
                 }
 
-                p.HeldBonus = 0;
+                p.HeldBonus = NPCID(0);
                 p.Section = 0;
                 p.Location.Height = Physics.PlayerHeight[p.Character][p.State];
                 p.Location.Width = Physics.PlayerWidth[p.Character][p.State];
             }
 
             SetupPlayers();
-            CreditChop = ScreenH / 2; // 100
+            CreditChop = XRender::TargetH / 2; // 100
             EndCredits = 0;
             GameOutroDoQuit = false;
             SetupCredits();
@@ -851,7 +865,7 @@ int GameMain(const CmdLineSetup_t &setup)
                 // if(A >= 1 && A <= 5)
                 p.Character = g_gameInfo.introCharacterNext();
 
-                p.HeldBonus = 0;
+                p.HeldBonus = NPCID(0);
                 p.Section = 0;
                 p.Location.Height = Physics.PlayerHeight[p.Character][p.State];
                 p.Location.Width = Physics.PlayerWidth[p.Character][p.State];
@@ -1165,7 +1179,7 @@ int GameMain(const CmdLineSetup_t &setup)
             {
                 MessageText = fmt::format_ne(g_gameStrings.errorInvalidEnterWarp,
                                              FullFileName,
-                                             StartWarp,
+                                             Player[1].Warp,
                                              numWarps);
                 startError = true;
             }
@@ -1183,7 +1197,11 @@ int GameMain(const CmdLineSetup_t &setup)
 
                 PauseGame(PauseCode::Message);
 
-                ++Lives;
+                if(g_compatibility.modern_lives_system)
+                    ++g_100s;
+                else
+                    ++Lives;
+
                 EveryonesDead();
                 clearScreenFaders();
 
@@ -1856,7 +1874,7 @@ void CheckActive()
 //        SoundPauseEngine(0);
 
 /* // Useless condition
-    if(!noSound && MusicPaused)
+    if(MusicPaused)
     {
         if(MusicPaused)
         {
@@ -1920,27 +1938,63 @@ void MoreScore(int addScore, const Location_t &Loc, vbint_t &Multiplier)
 
     if(GameMenu || GameOutro || BattleMode)
         return;
+
     A = addScore + Multiplier;
+
     if(A == 0)
         return;
+
     Multiplier++;
-    if(A > 13)
-        A = 13;
-    if(A < addScore)
-        A = addScore;
+
     if(Multiplier > 9)
         Multiplier = 8;
+
+    if(A < addScore)
+        A = addScore;
+
     if(A > 13)
         A = 13;
+
     if(Points[A] <= 5)
     {
-        Lives += Points[A];
+        if(g_compatibility.modern_lives_system)
+            g_100s += Points[A];
+        else
+            Lives += Points[A];
+
         PlaySound(SFX_1up, Points[A] - 1);
     }
     else
         Score += Points[A];
+
     NewEffect(EFFID_SCORE, Loc);
     Effect[numEffects].Frame = A - 1;
+}
+
+void Got100Coins()
+{
+    if(g_compatibility.modern_lives_system)
+    {
+        if(g_100s < 9999)
+        {
+            g_100s++;
+            PlaySound(SFX_1up);
+            Coins -= 100;
+        }
+        else
+            Coins = 99;
+    }
+    else
+    {
+        if(Lives < 99)
+        {
+            Lives += 1;
+            PlaySound(SFX_1up);
+            Coins -= 100;
+        }
+        else
+            Coins = 99;
+    }
 }
 
 void SizableBlocks()
@@ -1994,7 +2048,7 @@ void StartEpisode()
         Player[i].Mount = 0;
         // reassigned below unless something is wrong
         Player[i].Character = (i - 1) % 5 + 1;
-        Player[i].HeldBonus = 0;
+        Player[i].HeldBonus = NPCID(0);
         Player[i].CanFly = false;
         Player[i].CanFly2 = false;
         Player[i].TailCount = 0;
@@ -2022,6 +2076,7 @@ void StartEpisode()
     numStars = 0;
     Coins = 0;
     Score = 0;
+    g_100s = 3;
     Lives = 3;
     LevelSelect = true;
     GameMenu = false;
@@ -2130,7 +2185,7 @@ void StartBattleMode()
         Player[i].Mount = 0;
         // reassigned below unless something is wrong
         Player[i].Character = (i - 1) % 5 + 1;
-        Player[i].HeldBonus = 0;
+        Player[i].HeldBonus = NPCID(0);
         Player[i].CanFly = false;
         Player[i].CanFly2 = false;
         Player[i].TailCount = 0;
@@ -2156,6 +2211,7 @@ void StartBattleMode()
     numStars = 0;
     Coins = 0;
     Score = 0;
+    g_100s = 0;
     Lives = 99;
     BattleLives[1] = 3;
     BattleLives[2] = 3;

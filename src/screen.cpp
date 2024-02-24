@@ -18,14 +18,47 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "sdl_proxy/sdl_stdinc.h"
+
 #include "screen.h"
 #include "globals.h" // SingleCoop
+
+#include "core/render.h" // XRender::TargetX
 
 RangeArr<Screen_t, 0, c_screenCount - 1> Screens;
 Screen_t* l_screen = &Screens[0];
 
 RangeArr<qScreen_t, 0, c_vScreenCount> qScreenLoc;
 RangeArr<vScreen_t, 0, c_vScreenCount> vScreen;
+
+
+int vScreen_t::TargetX() const
+{
+    return Screens[screen_ref].TargetX() + ScreenLeft;
+}
+
+int vScreen_t::TargetY() const
+{
+    return Screens[screen_ref].TargetY() + ScreenTop;
+}
+
+double vScreen_t::CameraAddX() const
+{
+#ifdef PGE_MIN_PORT
+    return SDL_round(X / 2) * 2;
+#else
+    return X;
+#endif
+}
+
+double vScreen_t::CameraAddY() const
+{
+#ifdef PGE_MIN_PORT
+    return SDL_round(Y / 2) * 2;
+#else
+    return Y;
+#endif
+}
 
 Screen_t& Screen_t::canonical_screen()
 {
@@ -98,6 +131,16 @@ int Screen_t::active_end() const
         return player_count <= maxLocalPlayers ? player_count : maxLocalPlayers;
 
     return 1;
+}
+
+int Screen_t::TargetX() const
+{
+    return XRender::TargetW / 2 - W / 2;
+}
+
+int Screen_t::TargetY() const
+{
+    return XRender::TargetH / 2 - H / 2;
 }
 
 void InitScreens()
@@ -186,10 +229,3 @@ int vScreenIdxByPlayer_canonical(int player)
 
     return screen.vScreen_refs[0];
 }
-
-// temporary helpers while game is being converted to use Screen_t
-int& ScreenType = Screens[0].Type;
-int& DScreenType = Screens[0].DType;
-
-int& ScreenW = Screens[0].W;
-int& ScreenH = Screens[0].H;

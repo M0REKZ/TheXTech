@@ -91,11 +91,12 @@ bool RenderGL::isWorking()
 
 RenderGL::VertexList& RenderGL::getOrderedDrawVertexList(RenderGL::DrawContext_t context, int depth)
 {
-    if(context == m_recent_draw_context)
+    // combine draw calls issued in sequence (except bitmask calls)
+    if(context == m_recent_draw_context && (!context.texture || !context.texture->d.mask_texture_id))
         return m_ordered_draw_queue[{m_recent_draw_context_depth, context}];
 
     // optimization for buffer-read shaders: only use a single depth per frame
-    bool accel_mask = !m_use_logicop || m_gl_profile == SDL_GL_CONTEXT_PROFILE_ES;
+    bool accel_mask = !m_use_logicop;
     bool is_mask = context.program == &m_standard_program && context.texture && context.texture->d.mask_texture_id;
 
     if((context.program && (context.program->get_flags() & GLProgramObject::read_buffer)) || (accel_mask && is_mask))
@@ -225,6 +226,8 @@ void RenderGL::addLights(const GLPictureLightInfo& light_info, const QuadI& loc,
             }
 
             // place the light in the scene, including any rotoscale transformations
+            bool onscreen = false;
+
             int num_pts = (new_light.type == GLLightType::box || new_light.type == GLLightType::bar) ? 2 : 1;
             for(int pt = 0; pt < num_pts; pt++)
             {
@@ -236,10 +239,18 @@ void RenderGL::addLights(const GLPictureLightInfo& light_info, const QuadI& loc,
 
                 x_dest = (loc.br.x * x_coord * y_coord) + (loc.bl.x * (1 - x_coord) * y_coord) + (loc.tr.x * x_coord * (1 - y_coord)) + (loc.tl.x * (1 - x_coord) * (1 - y_coord));
                 y_dest = (loc.br.y * x_coord * y_coord) + (loc.bl.y * (1 - x_coord) * y_coord) + (loc.tr.y * x_coord * (1 - y_coord)) + (loc.tl.y * (1 - x_coord) * (1 - y_coord));
+
+                // use a 16 pixel margin for detecting onscreen draws (cross-ref the lighting shader)
+                if(x_dest >= -16 && x_dest < m_viewport.w + 16 && y_dest >= -16 && y_dest < m_viewport.h + 16)
+                    onscreen = true;
             }
 
             // set depth
             new_light.depth = depth;
+
+            // cancel light if offscreen
+            if(!onscreen)
+                m_light_count--;
 
             if(m_light_count >= (int)m_light_queue.lights.size())
                 break;
@@ -525,11 +536,11 @@ void RenderGL::applyViewport()
     }
     else
     {
-        int phys_offset_x = viewport.x * m_phys_w / ScreenW;
-        int phys_width = viewport.w * m_phys_w / ScreenW;
+        int phys_offset_x = viewport.x * m_phys_w / XRender::TargetW;
+        int phys_width = viewport.w * m_phys_w / XRender::TargetW;
 
-        int phys_offset_y = viewport.y * m_phys_h / ScreenH;
-        int phys_height = viewport.h * m_phys_h / ScreenH;
+        int phys_offset_y = viewport.y * m_phys_h / XRender::TargetH;
+        int phys_height = viewport.h * m_phys_h / XRender::TargetH;
 
         y_sign = -1;
 
@@ -550,12 +561,12 @@ void RenderGL::applyViewport()
 
         m_shader_read_viewport = {
             // multiply
-            0.5f * (float)viewport.w / (float)ScreenW,
-            0.5f * (float)viewport.h / (float)ScreenH,
+            0.5f * (float)viewport.w / (float)XRender::TargetW,
+            0.5f * (float)viewport.h / (float)XRender::TargetH,
 
             // add
-            ((float)(viewport.x + off.x) + 0.5f * (float)viewport.w) / (float)ScreenW,
-            ((float)(viewport.y + off.y) + 0.5f * (float)viewport.h) / (float)ScreenH,
+            ((float)(viewport.x + off.x) + 0.5f * (float)viewport.w) / (float)XRender::TargetW,
+            ((float)(viewport.y + off.y) + 0.5f * (float)viewport.h) / (float)XRender::TargetH,
         };
 
         m_transform_tick++;
@@ -584,8 +595,8 @@ void RenderGL::updateViewport()
     m_hidpi_x = (float)hardware_w / (float)window_w;
     m_hidpi_y = (float)hardware_h / (float)window_h;
 
-    float scale_x = (float)hardware_w / ScreenW;
-    float scale_y = (float)hardware_h / ScreenH;
+    float scale_x = (float)hardware_w / XRender::TargetW;
+    float scale_y = (float)hardware_h / XRender::TargetH;
 
     float scale = SDL_min(scale_x, scale_y);
 
@@ -598,8 +609,8 @@ void RenderGL::updateViewport()
     if(g_videoSettings.scaleMode == SCALE_FIXED_2X && scale > 2.f)
         scale = 2.f;
 
-    m_phys_w = ScreenW * scale;
-    m_phys_h = ScreenH * scale;
+    m_phys_w = XRender::TargetW * scale;
+    m_phys_h = XRender::TargetH * scale;
 
     pLogDebug("Window resolution is %d x %d; physical draw screen is %d x %d", hardware_w, hardware_h, m_phys_w, m_phys_h);
 
@@ -608,10 +619,10 @@ void RenderGL::updateViewport()
 
     resetViewport();
 
-    if(ScaleWidth != ScreenW || ScaleHeight != ScreenH || m_current_scale_mode != g_videoSettings.scaleMode)
+    if(ScaleWidth != XRender::TargetW || ScaleHeight != XRender::TargetH || m_current_scale_mode != g_videoSettings.scaleMode)
     {
         // update render targets
-        if(ScaleWidth != ScreenW || ScaleHeight != ScreenH)
+        if(ScaleWidth != XRender::TargetW || ScaleHeight != XRender::TargetH)
         {
 #ifdef USE_SCREENSHOTS_AND_RECS
             // invalidates GIF recorder handle
@@ -621,8 +632,8 @@ void RenderGL::updateViewport()
 
             initFramebuffers();
 
-            ScaleWidth = ScreenW;
-            ScaleHeight = ScreenH;
+            ScaleWidth = XRender::TargetW;
+            ScaleHeight = XRender::TargetH;
         }
 
         // update render texture scaling mode
@@ -644,14 +655,14 @@ void RenderGL::resetViewport()
 {
     // NOTE: resetViewport should not affect the viewport offset variable. Commented out logic.
 
-    bool viewport_same = (m_viewport.x == 0 && m_viewport.y == 0 && m_viewport.w == ScreenW && m_viewport.h == ScreenH);
+    bool viewport_same = (m_viewport.x == 0 && m_viewport.y == 0 && m_viewport.w == XRender::TargetW && m_viewport.h == XRender::TargetH);
     // bool no_offset = m_viewport_offset_ignore || (m_viewport_offset.x == 0 && m_viewport_offset.y == 0);
     bool viewport_changed = (!viewport_same /*|| !no_offset*/);
 
     if(viewport_changed)
         flushDrawQueues();
 
-    m_viewport = RectSizeI(0, 0, ScreenW, ScreenH);
+    m_viewport = RectSizeI(0, 0, XRender::TargetW, XRender::TargetH);
 
     // m_viewport_offset = PointI(0, 0);
     // m_viewport_offset_ignore = false;
@@ -704,14 +715,14 @@ void RenderGL::offsetViewportIgnore(bool en)
 
 void RenderGL::mapToScreen(int x, int y, int *dx, int *dy)
 {
-    *dx = static_cast<int>((static_cast<float>(x) * m_hidpi_x - m_phys_x) * ScreenW / m_phys_w);
-    *dy = static_cast<int>((static_cast<float>(y) * m_hidpi_y - m_phys_y) * ScreenH / m_phys_h);
+    *dx = static_cast<int>((static_cast<float>(x) * m_hidpi_x - m_phys_x) * XRender::TargetW / m_phys_w);
+    *dy = static_cast<int>((static_cast<float>(y) * m_hidpi_y - m_phys_y) * XRender::TargetH / m_phys_h);
 }
 
 void RenderGL::mapFromScreen(int scr_x, int scr_y, int *window_x, int *window_y)
 {
-    *window_x = ((float)scr_x * m_phys_w / ScreenW + m_phys_x) / m_hidpi_x;
-    *window_y = ((float)scr_y * m_phys_h / ScreenH + m_phys_y) / m_hidpi_y;
+    *window_x = ((float)scr_x * m_phys_w / XRender::TargetW + m_phys_x) / m_hidpi_x;
+    *window_y = ((float)scr_y * m_phys_h / XRender::TargetH + m_phys_y) / m_hidpi_y;
 }
 
 #ifdef __EMSCRIPTEN__
@@ -1051,7 +1062,7 @@ void RenderGL::compileShaders(StdPicture &target)
     }
 
     if(target.d.shader_program)
-        target.d.shader_program->restore_uniforms(target.l);
+        target.d.shader_program->restore_uniforms(target);
 #else
     UNUSED(target);
 #endif
@@ -1069,11 +1080,7 @@ bool RenderGL::depthTestSupported()
 
 bool RenderGL::userShadersSupported()
 {
-#ifdef THEXTECH_WIP_FEATURES
     return m_use_shaders && m_buffer_texture[BUFFER_FB_READ] && m_buffer_texture[BUFFER_INT_PASS_1];
-#else
-    return false;
-#endif
 }
 
 void RenderGL::unloadTexture(StdPicture &tx)
@@ -1153,7 +1160,7 @@ int RenderGL::registerUniform(StdPicture &target, const char* name)
 {
 
     if(userShadersSupported() && target.d.shader_program && target.d.shader_program->inited())
-        return target.d.shader_program->register_uniform(name, target.l);
+        return target.d.shader_program->register_uniform(name, target);
     else
         return AbstractRender_t::registerUniform(target, name);
 }
@@ -1161,7 +1168,7 @@ int RenderGL::registerUniform(StdPicture &target, const char* name)
 void RenderGL::assignUniform(StdPicture &target, int index, const UniformValue_t& value)
 {
     if(userShadersSupported() && target.d.shader_program && target.d.shader_program->inited())
-        return target.d.shader_program->assign_uniform(index, value, target.l);
+        return target.d.shader_program->assign_uniform(index, value, target);
     else
         return AbstractRender_t::assignUniform(target, index, value);
 }
@@ -1793,8 +1800,8 @@ void RenderGL::getScreenPixels(int x, int y, int w, int h, unsigned char *pixels
 
     mapFromScreen(x, y, &phys_x, &phys_y);
 
-    int phys_w = w * m_phys_w / ScreenW;
-    int phys_h = h * m_phys_h / ScreenH;
+    int phys_w = w * m_phys_w / XRender::TargetW;
+    int phys_h = h * m_phys_h / XRender::TargetH;
 
     // allocate buffer for screen-space pixels
     uint8_t* phys_pixels = (uint8_t*)malloc(phys_w * phys_h * 3);
@@ -1809,14 +1816,14 @@ void RenderGL::getScreenPixels(int x, int y, int w, int h, unsigned char *pixels
     for(int r = 0; r < h; r++)
     {
         int phys_r_max = phys_h - 1;
-        int phys_r_ind = r * m_phys_h / ScreenH;
+        int phys_r_ind = r * m_phys_h / XRender::TargetH;
 
         // vertical flip from OpenGL to image
         int phys_r = phys_r_max - phys_r_ind;
 
         for(int c = 0; c < w; c++)
         {
-            int phys_c = c * m_phys_w / ScreenW;
+            int phys_c = c * m_phys_w / XRender::TargetW;
 
             pixels[(r * w + c) * 3 + 0] = phys_pixels[(phys_r * phys_w + phys_c) * 3 + 0];
             pixels[(r * w + c) * 3 + 1] = phys_pixels[(phys_r * phys_w + phys_c) * 3 + 1];
@@ -1851,8 +1858,8 @@ void RenderGL::getScreenPixelsRGBA(int x, int y, int w, int h, unsigned char *pi
 
         phys_x *= m_hidpi_x;
         phys_y *= m_hidpi_y;
-        phys_w = w * m_phys_w / ScreenW;
-        phys_h = h * m_phys_h / ScreenH;
+        phys_w = w * m_phys_w / XRender::TargetW;
+        phys_h = h * m_phys_h / XRender::TargetH;
     }
 
     // allocate buffer for screen-space pixels

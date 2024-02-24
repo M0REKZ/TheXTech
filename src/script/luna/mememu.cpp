@@ -27,6 +27,7 @@
 #include "globals.h"
 #include "global_constants.h"
 #include "layers.h"
+#include "compat.h"
 #include "game_main.h" // GamePaused
 #include "main/trees.h" // treeNPCUpdate
 #include "npc/npc_queues.h"
@@ -559,7 +560,33 @@ public:
         insert(0x00B25980, &numWorldMusic);
 
         insert(0x00B2C5A8, &Coins); // HUD coins count
-        insert(0x00B2C5AC, &Lives); // HUD lives count
+        insert(0x00B2C5AC, // HUD lives count
+            [](FIELDTYPE ftype)->double
+            {
+                int tmp = g_compatibility.modern_lives_system ? g_100s : Lives;
+                if(tmp < 0)
+                    tmp = 0;
+                if(tmp > 99)
+                    tmp = 99;
+                return valueToMem(tmp, ftype);
+            },
+            [](double in, FIELDTYPE ftype)->void
+            {
+                if(!g_compatibility.modern_lives_system)
+                    memToValue(Lives, in, ftype);
+
+                int old = g_100s;
+                if(old < 0)
+                    old = 0;
+                if(old > 99)
+                    old = 99;
+
+                int out = old;
+                memToValue(out, in, ftype);
+
+                g_100s += out - old;
+            }
+        );  // lives now replaced by g_100s
 
         insert(0x00B2C624, &WorldName);
 
@@ -654,7 +681,7 @@ public:
         insert(0x00B2D6D0, &MenuMouseRelease);
         insert(0x00B2D6D2, &SharedCursor.Move);
         insert(0x00B2D710, &numEvents);
-        insert(0x00B2D734, &noSound);
+        // insert(0x00B2D734, &noSound); // deprecated, can read g_mixerLoaded
         insert(0x00B2D740, &BattleMode);
     }
 
@@ -1428,7 +1455,8 @@ public:
         insert(0x00000040, &Player_t::Vine);
         insert(0x00000042, &Player_t::NoShellKick);
         insert(0x00000044, &Player_t::ShellSurf);
-        insert(0x00000046, &Player_t::StateNPC);
+        static_assert(sizeof(Player_t::StateNPC) == sizeof(vbint_t), "underlying type of Player_t::StateNPC must be vbint_t");
+        insert(0x00000046, reinterpret_cast<vbint_t Player_t::*>(&Player_t::StateNPC));
         insert(0x00000048, &Player_t::Slope);
         insert(0x0000004a, &Player_t::Stoned);
         insert(0x0000004c, &Player_t::StonedCD);
@@ -1506,7 +1534,8 @@ public:
         insert(0x00000150, &Player_t::m2Speed);
         insert(0x00000154, &Player_t::HoldingNPC);
         insert(0x00000156, &Player_t::CanGrabNPCs);
-        insert(0x00000158, &Player_t::HeldBonus);
+        static_assert(sizeof(Player_t::HeldBonus) == sizeof(vbint_t), "underlying type of Player_t::HeldBonus must be vbint_t");
+        insert(0x00000158, reinterpret_cast<vbint_t Player_t::*>(&Player_t::HeldBonus));
         insert(0x0000015a, &Player_t::Section);
         insert(0x0000015c, &Player_t::WarpCD);
         insert(0x0000015e, &Player_t::Warp);
@@ -1863,7 +1892,8 @@ public:
         // insert(0x00000078, &NPC_t::Location); // between 0x78 and 0xA8
         // insert(0x000000a8, &NPC_t::DefaultLocation); // between 0xA8 and 0xD8
         insert(0x000000d8, &NPC_t::DefaultDirection);
-        insert(0x000000dc, &NPC_t::DefaultType);
+        static_assert(sizeof(NPC_t::DefaultType) == sizeof(vbint_t), "underlying type of NPC_t::DefaultType must be vbint_t");
+        insert(0x000000dc, reinterpret_cast<vbint_t NPC_t::*>(&NPC_t::DefaultType));
         insert(0x000000de, &NPC_t::DefaultSpecial);
         insert(0x000000e0, &NPC_t::DefaultSpecial2);
         insert(0x000000e2, // Type
@@ -1873,7 +1903,10 @@ public:
             },
             [](NPC_t& n, double in, FIELDTYPE ftype)->void
             {
-                memToValue(n.Type, in, ftype);
+                int type = NPCID(0);
+                memToValue(type, in, ftype);
+
+                n.Type = NPCID(type);
 
                 // may have switched to/from an always-active type
                 if(NPCQueues::check_active(n))
@@ -1944,7 +1977,8 @@ public:
         insert(0x00000132, &NPC_t::BattleOwner);
         insert(0x00000134, &NPC_t::WallDeath);
         insert(0x00000136, &NPC_t::Projectile);
-        insert(0x00000138, &NPC_t::Effect);
+        static_assert(sizeof(NPC_t::Effect) == sizeof(vbint_t), "underlying type of NPC_t::Effect must be vbint_t");
+        insert(0x00000138, reinterpret_cast<vbint_t NPC_t::*>(&NPC_t::Effect));
         insert(0x0000013c, &NPC_t::Effect2);
         insert(0x00000144, &NPC_t::Effect3);
         insert(0x00000146, &NPC_t::Section);

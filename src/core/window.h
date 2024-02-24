@@ -48,6 +48,24 @@ extern void quit();
 
 #endif
 
+
+#ifdef WINDOW_CUSTOM
+
+constexpr bool is_nullptr()
+{
+    return false;
+}
+
+#else
+
+SDL_FORCE_INLINE bool is_nullptr()
+{
+    return !g_window;
+}
+
+#endif
+
+
 /*!
  * \brief Show the window
  */
@@ -65,6 +83,17 @@ E_INLINE void hide() TAIL
 #ifndef WINDOW_CUSTOM
 {
     g_window->hide();
+}
+#endif
+
+
+/*!
+ * \brief Updates the window icon based on AppPath
+ */
+E_INLINE void updateWindowIcon() TAIL
+#ifndef WINDOW_CUSTOM
+{
+    g_window->updateWindowIcon();
 }
 #endif
 

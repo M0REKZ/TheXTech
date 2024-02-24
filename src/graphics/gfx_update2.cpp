@@ -125,11 +125,12 @@ void UpdateGraphics2(bool skipRepaint)
         vScreen[Z].ScreenLeft = 0;
         vScreen[Z].Top = 0;
         vScreen[Z].ScreenTop = 0;
-        vScreen[Z].Width = ScreenW;
-        vScreen[Z].Height = ScreenH;
+        vScreen[Z].Width = Screens[0].W;
+        vScreen[Z].Height = Screens[0].H;
     }
     else
     {
+        SetupScreens();
         GetvScreenWorld(vScreen[Z]);
 
         if(qScreen)
@@ -264,6 +265,7 @@ void UpdateGraphics2(bool skipRepaint)
     XRender::setDrawPlane(PLANE_GAME_BACKDROP);
 
     XRender::clearBuffer();
+    XRender::resetViewport();
     DrawBackdrop(Screens[0]);
 
 //    if(TakeScreen == true)
@@ -321,11 +323,14 @@ void UpdateGraphics2(bool skipRepaint)
 //        Next A
 //    Else
 
-    XRender::setViewport(vScreen[Z].ScreenLeft, vScreen[Z].ScreenTop, vScreen[Z].Width, vScreen[Z].Height);
+    XRender::setViewport(vScreen[Z].TargetX() - XRender::TargetOverscanX, vScreen[Z].TargetY(), vScreen[Z].Width + 2 * XRender::TargetOverscanX, vScreen[Z].Height);
 
-    double sLeft = -vScreen[1].X;
+    double camX = vScreen[Z].CameraAddX();
+    double camY = vScreen[Z].CameraAddY();
+
+    double sLeft = -vScreen[1].X - 2 * XRender::TargetOverscanX;
     double sTop = -vScreen[1].Y;
-    double sRight = -vScreen[1].X + vScreen[1].Width;
+    double sRight = -vScreen[1].X + vScreen[1].Width + 2 * XRender::TargetOverscanX;
     double sBottom = -vScreen[1].Y + vScreen[1].Height;
 
     {
@@ -347,9 +352,9 @@ void UpdateGraphics2(bool skipRepaint)
             if(CheckCollision(sView, tile.Location))
             {
                 g_stats.renderedTiles++;
-//                XRender::renderTexture(vScreen[Z].X + Tile[A].Location.X, vScreen[Z].Y + Tile[A].Location.Y, Tile[A].Location.Width, Tile[A].Location.Height, GFXTile[Tile[A].Type], 0, TileHeight[Tile[A].Type] * TileFrame[Tile[A].Type]);
-                XRender::renderTexture(vScreen[Z].X + tile.Location.X,
-                                      vScreen[Z].Y + tile.Location.Y,
+//                XRender::renderTexture(camX + Tile[A].Location.X, camY + Tile[A].Location.Y, Tile[A].Location.Width, Tile[A].Location.Height, GFXTile[Tile[A].Type], 0, TileHeight[Tile[A].Type] * TileFrame[Tile[A].Type]);
+                XRender::renderTexture(camX + tile.Location.X,
+                                      camY + tile.Location.Y,
                                       tile.Location.Width,
                                       tile.Location.Height,
                                       GFXTileBMP[tile.Type], 0, TileHeight[tile.Type] * TileFrame[tile.Type]);
@@ -368,10 +373,10 @@ void UpdateGraphics2(bool skipRepaint)
             if(CheckCollision(sView, scene.Location) && (WorldEditor || scene.Active))
             {
                 g_stats.renderedScenes++;
-//                XRender::renderTexture(vScreen[Z].X + scene.Location.X, vScreen[Z].Y + scene.Location.Y, scene.Location.Width, scene.Location.Height, GFXSceneMask[scene.Type], 0, SceneHeight[scene.Type] * SceneFrame[scene.Type]);
-//                XRender::renderTexture(vScreen[Z].X + scene.Location.X, vScreen[Z].Y + scene.Location.Y, scene.Location.Width, scene.Location.Height, GFXScene[scene.Type], 0, SceneHeight[scene.Type] * SceneFrame[scene.Type]);
-                XRender::renderTexture(vScreen[Z].X + scene.Location.X,
-                                      vScreen[Z].Y + scene.Location.Y,
+//                XRender::renderTexture(camX + scene.Location.X, camY + scene.Location.Y, scene.Location.Width, scene.Location.Height, GFXSceneMask[scene.Type], 0, SceneHeight[scene.Type] * SceneFrame[scene.Type]);
+//                XRender::renderTexture(camX + scene.Location.X, camY + scene.Location.Y, scene.Location.Width, scene.Location.Height, GFXScene[scene.Type], 0, SceneHeight[scene.Type] * SceneFrame[scene.Type]);
+                XRender::renderTexture(camX + scene.Location.X,
+                                      camY + scene.Location.Y,
                                       scene.Location.Width, scene.Location.Height,
                                       GFXSceneBMP[scene.Type], 0, SceneHeight[scene.Type] * SceneFrame[scene.Type]);
             }
@@ -389,10 +394,10 @@ void UpdateGraphics2(bool skipRepaint)
             if(CheckCollision(sView, path.Location) && (WorldEditor || path.Active))
             {
                 g_stats.renderedPaths++;
-//                XRender::renderTexture(vScreen[Z].X + path.Location.X, vScreen[Z].Y + path.Location.Y, path.Location.Width, path.Location.Height, GFXPathMask[path.Type], 0, 0);
-//                XRender::renderTexture(vScreen[Z].X + path.Location.X, vScreen[Z].Y + path.Location.Y, path.Location.Width, path.Location.Height, GFXPath[path.Type], 0, 0);
-                XRender::renderTexture(vScreen[Z].X + path.Location.X,
-                                      vScreen[Z].Y + path.Location.Y,
+//                XRender::renderTexture(camX + path.Location.X, camY + path.Location.Y, path.Location.Width, path.Location.Height, GFXPathMask[path.Type], 0, 0);
+//                XRender::renderTexture(camX + path.Location.X, camY + path.Location.Y, path.Location.Width, path.Location.Height, GFXPath[path.Type], 0, 0);
+                XRender::renderTexture(camX + path.Location.X,
+                                      camY + path.Location.Y,
                                       path.Location.Width, path.Location.Height,
                                       GFXPathBMP[path.Type], 0, 0);
             }
@@ -408,16 +413,20 @@ void UpdateGraphics2(bool skipRepaint)
 
             g_stats.checkedLevels++;
 
-            Location_t locGFX = lvlP.LocationGFX();
+            // using this for the onscreen collision fixes bugs where levels with large graphics or Big Path backgrounds would not be drawn when partially offscreen
+            //   could use a compat check here to choose between LocationOnscreen and Location if desired
+            Location_t locOnscreen = lvlP.LocationOnscreen();
 
-            if(CheckCollision(sView, locGFX) && (WorldEditor || lvlP.Active))
+            if(CheckCollision(sView, locOnscreen) && (WorldEditor || lvlP.Active))
             {
+                Location_t locGFX = lvlP.LocationGFX();
+
                 g_stats.renderedLevels++;
 
                 if(lvlP.Path)
                 {
-                    XRender::renderTexture(vScreen[Z].X + lvlP.Location.X,
-                                          vScreen[Z].Y + lvlP.Location.Y,
+                    XRender::renderTexture(camX + lvlP.Location.X,
+                                          camY + lvlP.Location.Y,
                                           lvlP.Location.Width,
                                           lvlP.Location.Height,
                                           GFXLevelBMP[0], 0, 0);
@@ -425,14 +434,14 @@ void UpdateGraphics2(bool skipRepaint)
 
                 if(lvlP.Path2)
                 {
-                    XRender::renderTexture(vScreen[Z].X + lvlP.Location.X - 16,
-                                          vScreen[Z].Y + 8 + lvlP.Location.Y,
+                    XRender::renderTexture(camX + lvlP.Location.X - 16,
+                                          camY + 8 + lvlP.Location.Y,
                                           64, 32,
                                           GFXLevelBMP[29], 0, 0);
                 }
 
-                XRender::renderTexture(vScreen[Z].X + locGFX.X,
-                                      vScreen[Z].Y + locGFX.Y,
+                XRender::renderTexture(camX + locGFX.X,
+                                      camY + locGFX.Y,
                                       locGFX.Width, locGFX.Height,
                                       GFXLevelBMP[lvlP.Type], 0, 32 * LevelFrame[lvlP.Type]);
             }
@@ -447,8 +456,8 @@ void UpdateGraphics2(bool skipRepaint)
         {
             if(vScreenCollision(Z, Effect[A].Location))
             {
-                XRender::renderTexture(vScreen[Z].X + Effect[A].Location.X,
-                    vScreen[Z].Y + Effect[A].Location.Y,
+                XRender::renderTexture(camX + Effect[A].Location.X,
+                    camY + Effect[A].Location.Y,
                     Effect[A].Location.Width, Effect[A].Location.Height,
                     GFXEffect[Effect[A].Type], 0, Effect[A].Frame * EffectHeight[Effect[A].Type]);
             }
@@ -461,9 +470,9 @@ void UpdateGraphics2(bool skipRepaint)
             WorldMusic_t &music = *t;
             if(vScreenCollision(Z, music.Location))
             {
-                XRender::renderRect(vScreen[Z].X + music.Location.X, vScreen[Z].Y + music.Location.Y, 32, 32,
+                XRender::renderRect(camX + music.Location.X, camY + music.Location.Y, 32, 32,
                     {255, 0, 255}, false);
-                SuperPrint(std::to_string(music.Type), 1, vScreen[Z].X + music.Location.X + 2, vScreen[Z].Y + music.Location.Y + 2);
+                SuperPrint(std::to_string(music.Type), 1, camX + music.Location.X + 2, camY + music.Location.Y + 2);
             }
         }
 
@@ -476,26 +485,26 @@ void UpdateGraphics2(bool skipRepaint)
                 XTColor color = XTColorF(1.0f, 0.8f, 0.2f);
 
                 // draw rect with outline
-                XRender::renderRect(vScreen[Z].X + area.Location.X, vScreen[Z].Y + area.Location.Y,
+                XRender::renderRect(camX + area.Location.X, camY + area.Location.Y,
                     area.Location.Width, area.Location.Height,
                     {0, 0, 0}, false);
-                XRender::renderRect(vScreen[Z].X + area.Location.X + 1, vScreen[Z].Y + area.Location.Y + 1,
+                XRender::renderRect(camX + area.Location.X + 1, camY + area.Location.Y + 1,
                     area.Location.Width - 2, area.Location.Height - 2,
                     {0, 0, 0}, false);
-                XRender::renderRect(vScreen[Z].X + area.Location.X + 2, vScreen[Z].Y + area.Location.Y + 2,
+                XRender::renderRect(camX + area.Location.X + 2, camY + area.Location.Y + 2,
                     area.Location.Width - 4, area.Location.Height - 4,
                     color, false);
-                XRender::renderRect(vScreen[Z].X + area.Location.X + 3, vScreen[Z].Y + area.Location.Y + 3,
+                XRender::renderRect(camX + area.Location.X + 3, camY + area.Location.Y + 3,
                     area.Location.Width - 6, area.Location.Height - 6,
                     color, false);
 
                 // highlight selectable area
-                XRender::renderRect(vScreen[Z].X + area.Location.X + 4, vScreen[Z].Y + area.Location.Y + 4,
+                XRender::renderRect(camX + area.Location.X + 4, camY + area.Location.Y + 4,
                     28, 28,
                     XTColorF(1.0f, 1.0f, 0.0f, 0.5f), true);
 
                 // label with index
-                SuperPrint(std::to_string(A), 1, vScreen[Z].X + area.Location.X + 4, vScreen[Z].Y + area.Location.Y + 4);
+                SuperPrint(std::to_string(A), 1, camX + area.Location.X + 4, camY + area.Location.Y + 4);
             }
         }
 
@@ -527,10 +536,10 @@ void UpdateGraphics2(bool skipRepaint)
             break;
         }
 
-//        XRender::renderTexture(vScreen[Z].X + WorldPlayer[1].Location.X, vScreen[Z].Y + WorldPlayer[1].Location.Y - 10 + WorldPlayer[1].Location.Height - WPHeight, WorldPlayer[1].Location.Width, WPHeight, GFXPlayerMask[WorldPlayer[1].Type], 0, WPHeight * WorldPlayer[1].Frame);
-//        XRender::renderTexture(vScreen[Z].X + WorldPlayer[1].Location.X, vScreen[Z].Y + WorldPlayer[1].Location.Y - 10 + WorldPlayer[1].Location.Height - WPHeight, WorldPlayer[1].Location.Width, WPHeight, GFXPlayer[WorldPlayer[1].Type], 0, WPHeight * WorldPlayer[1].Frame);
-        XRender::renderTexture(vScreen[Z].X + WorldPlayer[1].Location.X,
-                              vScreen[Z].Y + WorldPlayer[1].Location.Y - 10 + WorldPlayer[1].Location.Height - WPHeight,
+//        XRender::renderTexture(camX + WorldPlayer[1].Location.X, camY + WorldPlayer[1].Location.Y - 10 + WorldPlayer[1].Location.Height - WPHeight, WorldPlayer[1].Location.Width, WPHeight, GFXPlayerMask[WorldPlayer[1].Type], 0, WPHeight * WorldPlayer[1].Frame);
+//        XRender::renderTexture(camX + WorldPlayer[1].Location.X, camY + WorldPlayer[1].Location.Y - 10 + WorldPlayer[1].Location.Height - WPHeight, WorldPlayer[1].Location.Width, WPHeight, GFXPlayer[WorldPlayer[1].Type], 0, WPHeight * WorldPlayer[1].Frame);
+        XRender::renderTexture(camX + WorldPlayer[1].Location.X,
+                              camY + WorldPlayer[1].Location.Y - 10 + WorldPlayer[1].Location.Height - WPHeight,
                               WorldPlayer[1].Location.Width, WPHeight,
                               GFXPlayerBMP[WorldPlayer[1].Type], 0, WPHeight * WorldPlayer[1].Frame);
 
@@ -542,8 +551,8 @@ void UpdateGraphics2(bool skipRepaint)
 
             auto policy = computeStarsShowingPolicy(l.starsShowPolicy, l.curStars);
 
-            int p_center_x = vScreen[Z].X + WorldPlayer[1].Location.X + (WorldPlayer[1].Location.Width / 2);
-            int info_y = vScreen[Z].Y + WorldPlayer[1].Location.Y - 32;
+            int p_center_x = camX + WorldPlayer[1].Location.X + (WorldPlayer[1].Location.Width / 2);
+            int info_y = camY + WorldPlayer[1].Location.Y - 32;
 
             if(l.save_info.inited() && l.save_info.max_stars > 0 && policy > Compatibility_t::STARS_DONT_SHOW)
             {
@@ -572,7 +581,7 @@ void UpdateGraphics2(bool skipRepaint)
             }
         }
 
-        XRender::resetViewport();
+        XRender::setViewport(Screens[0].TargetX(), Screens[0].TargetY(), Screens[0].W, Screens[0].H);
 
 #ifdef __3DS__
         XRender::setTargetLayer(2);
@@ -596,8 +605,8 @@ void UpdateGraphics2(bool skipRepaint)
         // prepare for player draw
         vScreen[0].X = 0;
         vScreen[0].Y = 0;
-        vScreen[0].Width = ScreenW;
-        vScreen[0].Height = ScreenH;
+        vScreen[0].Width = XRender::TargetW;
+        vScreen[0].Height = XRender::TargetH;
 
         for(int A = 1; A <= numPlayers; A++)
         {
@@ -606,22 +615,20 @@ void UpdateGraphics2(bool skipRepaint)
         }
 
         // Print lives on the screen
-        XRender::renderTexture(pX, vScreen[Z].ScreenTop - 4 - GFX.Interface[3].h, GFX.Interface[3].w, GFX.Interface[3].h, GFX.Interface[3], 0, 0);
-        XRender::renderTexture(pX + 40, vScreen[Z].ScreenTop - 2 - GFX.Interface[3].h, GFX.Interface[1].w, GFX.Interface[1].h, GFX.Interface[1], 0, 0);
+        DrawLives(pX + 32, vScreen[Z].ScreenTop - 20, Lives, g_100s);
 
-        SuperPrint(std::to_string(int(Lives)), 1, pX + 62, vScreen[Z].ScreenTop - 18);
         // Print coins on the screen
         auto& coin_icon = (Player[1].Character == 5) ? GFX.Interface[6] : GFX.Interface[2];
-        XRender::renderTexture(pX + 16, vScreen[Z].ScreenTop - 42, coin_icon.w, coin_icon.h, coin_icon, 0, 0);
 
-        XRender::renderTexture(pX + 40, vScreen[Z].ScreenTop - 40, GFX.Interface[1].w, GFX.Interface[1].h, GFX.Interface[1], 0, 0);
-
+        XRender::renderTexture(pX + 16, vScreen[Z].ScreenTop - 42, coin_icon);
+        XRender::renderTexture(pX + 40, vScreen[Z].ScreenTop - 40, GFX.Interface[1]);
         SuperPrint(std::to_string(Coins), 1, pX + 62, vScreen[Z].ScreenTop - 40);
+
         // Print stars on the screen
         if(numStars > 0)
         {
-            XRender::renderTexture(pX + 16, vScreen[Z].ScreenTop - 64, GFX.Interface[5].w, GFX.Interface[5].h, GFX.Interface[5], 0, 0);
-            XRender::renderTexture(pX + 40, vScreen[Z].ScreenTop - 62, GFX.Interface[1].w, GFX.Interface[1].h, GFX.Interface[1], 0, 0);
+            XRender::renderTexture(pX + 16, vScreen[Z].ScreenTop - 64, GFX.Interface[5]);
+            XRender::renderTexture(pX + 40, vScreen[Z].ScreenTop - 62, GFX.Interface[1]);
             SuperPrint(std::to_string(numStars), 1, pX + 62, vScreen[Z].ScreenTop - 62);
         }
 
@@ -671,11 +678,12 @@ void UpdateGraphics2(bool skipRepaint)
         }
 
         XRender::setDrawPlane(PLANE_WLD_META);
+        XRender::resetViewport();
 
         g_worldScreenFader.draw();
 
         if(PrintFPS > 0 && ShowFPS)
-            SuperPrint(std::to_string(int(PrintFPS)), 1, 8, 8, {0, 255, 0});
+            SuperPrint(std::to_string(int(PrintFPS)), 1, XRender::TargetOverscanX + 8, 8, {0, 255, 0});
 
         g_stats.print();
 
@@ -683,7 +691,7 @@ void UpdateGraphics2(bool skipRepaint)
         if(!BattleMode && !GameMenu && g_config.show_episode_title)
         {
             // big screen, display at top
-            if(ScreenH >= 640 && g_config.show_episode_title == Config_t::EPISODE_TITLE_TOP)
+            if(XRender::TargetH >= 640 && g_config.show_episode_title == Config_t::EPISODE_TITLE_TOP)
             {
                 int y = 20;
                 float alpha = 1.0f;
@@ -692,7 +700,7 @@ void UpdateGraphics2(bool skipRepaint)
             // display at bottom
             else if(g_config.show_episode_title == Config_t::EPISODE_TITLE_BOTTOM)
             {
-                int y = ScreenH - 60;
+                int y = XRender::TargetH - 60;
                 float alpha = 0.75f;
                 SuperPrintScreenCenter(WorldName, 3, y, XTAlphaF(alpha));
             }

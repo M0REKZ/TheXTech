@@ -295,7 +295,6 @@ void InitMixerX()
         std::string msg = fmt::format_ne("Can't open audio stream, continuing without audio: ({0})", Mix_GetError());
         pLogCritical(msg.c_str());
         XMsgBox::simpleMsgBox(XMsgBox::MESSAGEBOX_ERROR, "Sound opening error", msg);
-        noSound = true;
     }
     else
     {
@@ -346,7 +345,6 @@ void QuitMixerX()
 
     UnloadExtSounds();
 
-    noSound = true;
     if(g_curMusic)
         Mix_FreeMusic(g_curMusic);
     g_curMusic = nullptr;
@@ -529,7 +527,7 @@ void SetMusicVolume(const std::string &Alias, long Volume)
 
 void SoundPauseAll()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     pLogDebug("Pause all sound");
@@ -538,7 +536,7 @@ void SoundPauseAll()
 
 void SoundResumeAll()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     pLogDebug("Resume all sound");
@@ -547,8 +545,9 @@ void SoundResumeAll()
 
 void SoundPauseEngine(int paused)
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
+
     Mix_PauseAudio(paused);
 }
 
@@ -583,7 +582,7 @@ static void processPathArgs(std::string &path,
 
 void PlayMusic(const std::string &Alias, int fadeInMs)
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     if(g_curMusic)
@@ -637,14 +636,18 @@ void PlayMusic(const std::string &Alias, int fadeInMs)
         pLogWarning("Unknown music alias '%s'", Alias.c_str());
 }
 
-void PlaySfx(const std::string &Alias, int loops, int volume)
+void PlaySfx(const std::string &Alias, int loops, int volume, uint8_t left, uint8_t right)
 {
     auto sfx = sound.find(Alias);
     if(sfx != sound.end())
     {
         auto &s = sfx->second;
         if(!s.isSilent)
-            Mix_PlayChannelVol(s.channel, s.chunk, loops, volume);
+        {
+            int channel = Mix_PlayChannelVol(s.channel, s.chunk, loops, volume);
+            if(channel >= 0)
+                Mix_SetPanning(channel, left, right);
+        }
     }
 }
 
@@ -708,7 +711,7 @@ void StartMusic(int A, int fadeInMs)
 
     D_pLogDebug("Start music A=%d", A);
 
-    if(noSound)
+    if(!g_mixerLoaded)
     {
         // Keep world map music being remembered when sound disabled
         if((LevelSelect || WorldEditor) && !GameMenu && !GameOutro)
@@ -814,7 +817,7 @@ void StartMusic(int A, int fadeInMs)
 
 void PauseMusic()
 {
-    if(!musicPlaying || noSound)
+    if(!musicPlaying || !g_mixerLoaded)
         return;
 
     if(g_curMusic && Mix_PlayingMusicStream(g_curMusic))
@@ -823,7 +826,7 @@ void PauseMusic()
 
 void ResumeMusic()
 {
-    if(!musicPlaying || noSound)
+    if(!musicPlaying || !g_mixerLoaded)
         return;
 
     if(g_curMusic && Mix_PausedMusicStream(g_curMusic))
@@ -832,7 +835,7 @@ void ResumeMusic()
 
 void StopMusic()
 {
-    if(!musicPlaying || noSound)
+    if(!musicPlaying || !g_mixerLoaded)
         return;
 
     pLogDebug("Stopping music");
@@ -850,8 +853,9 @@ void StopMusic()
 
 void FadeOutMusic(int ms)
 {
-    if(!musicPlaying || noSound)
+    if(!musicPlaying || !g_mixerLoaded)
         return;
+
     pLogDebug("Fading out music");
     if(g_curMusic)
         Mix_FadeOutMusicStream(g_curMusic, ms);
@@ -1059,7 +1063,7 @@ static void restoreDefaultSfx()
 
 void InitSound()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     MusicRoot = AppPath + "music/";
@@ -1227,7 +1231,7 @@ static int getFallbackSfx(int A)
 
 void PlaySound(int A, int loops, int volume)
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     if(GameMenu || GameOutro) // || A == 26 || A == 27 || A == 29)
@@ -1249,6 +1253,37 @@ void PlaySound(int A, int loops, int volume)
     {
         std::string alias = fmt::format_ne("sound{0}", A);
         PlaySfx(alias, loops, volume);
+        s_resetSoundDelay(A);
+    }
+}
+
+void PlaySoundSpatial(int A, int l, int t, int r, int b, int loops, int volume)
+{
+    if(!g_mixerLoaded)
+        return;
+
+    if(GameMenu || GameOutro) // || A == 26 || A == 27 || A == 29)
+        return;
+
+    if(A > (int)g_totalSounds) // Play fallback sound for the missing SFX
+        A = getFallbackSfx(A);
+    else if(!s_useIceBallSfx && A == SFX_Iceball)
+        A = SFX_Fireball; // Fell back into fireball when iceball sound isn't preferred
+    else if(!s_useIceBallSfx && A == SFX_HeroIce)
+        A = SFX_HeroFire;
+    else if(!s_useNewIceSfx && (A == SFX_Freeze || A == SFX_Icebreak))
+        A = SFX_ShellHit; // Restore the old behavior
+
+    if(g_ClonedPlayerMode)
+        SoundPause[10] = 1;
+
+    if(SoundPause[A] == 0) // if the sound wasn't just played
+    {
+        uint8_t left, right;
+        Sound_ResolveSpatialMod(left, right, l, t, r, b);
+
+        std::string alias = fmt::format_ne("sound{0}", A);
+        PlaySfx(alias, loops, volume, left, right);
         s_resetSoundDelay(A);
     }
 }
@@ -1279,8 +1314,9 @@ void BlockSound()
 
 void UpdateSound()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
+
     For(A, 1, numSounds)
     {
         if(SoundPause[A] > 0)
@@ -1290,7 +1326,7 @@ void UpdateSound()
 
 void LoadCustomSound()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     if(GameMenu || GameOutro)
@@ -1337,8 +1373,9 @@ void LoadCustomSound()
 
 void UnloadCustomSound()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
+
     loadMusicIni(SoundScope::global, musicIni, true);
     restoreDefaultSfx();
     g_customMusicInDataFolder = false;
@@ -1349,7 +1386,7 @@ void UnloadCustomSound()
 
 void UpdateYoshiMusic()
 {
-    if(!s_musicHasYoshiMode)
+    if(!s_musicHasYoshiMode || !g_mixerLoaded)
         return;
 
     bool hasYoshi = false;
@@ -1362,7 +1399,7 @@ void UpdateYoshiMusic()
 
 void PreloadExtSound(const std::string& path)
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     auto f = extSfx.find(path);
@@ -1380,7 +1417,7 @@ void PreloadExtSound(const std::string& path)
 
 void UnloadExtSounds()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     SDL_AtomicSet(&extSfxBusy, 1);
@@ -1398,7 +1435,7 @@ void PlayExtSound(const std::string &path, int loops, int volume)
 {
     int play_ch = -1;
 
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     auto f = extSfx.find(path);
@@ -1441,7 +1478,7 @@ static void extSfxStopCallback(int channel)
 
 void StopExtSound(const std::string& path)
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     SDL_AtomicSet(&extSfxBusy, 1);
@@ -1462,7 +1499,7 @@ void StopExtSound(const std::string& path)
 
 void StopAllExtSounds()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     SDL_AtomicSet(&extSfxBusy, 1);
@@ -1477,7 +1514,7 @@ void StopAllExtSounds()
 
 void StopAllSounds()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     SDL_AtomicSet(&extSfxBusy, 1);
@@ -1504,7 +1541,7 @@ static void echoEffectDone(int, void *context)
 
 void SoundFX_SetEcho(const SoundFXEchoSetup& setup)
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     bool isNew = false;
@@ -1561,7 +1598,7 @@ static void reverbEffectDone(int, void *context)
 
 void SoundFX_SetReverb(const SoundFXReverb& setup)
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     bool isNew = false;
@@ -1595,7 +1632,7 @@ void SoundFX_SetReverb(const SoundFXReverb& setup)
 
 void SoundFX_Clear()
 {
-    if(noSound)
+    if(!g_mixerLoaded)
         return;
 
     if(effectEcho)
@@ -1637,7 +1674,7 @@ void UpdateSoundFX(int recentSection)
 #ifndef THEXTECH_ENABLE_AUDIO_FX
     UNUSED(recentSection);
 #else
-    if(noSound || LevelSelect)
+    if(!g_mixerLoaded || LevelSelect)
         return;
 
     SDL_assert_release(recentSection >= 0 && recentSection <= maxSections);

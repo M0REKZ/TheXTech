@@ -32,7 +32,7 @@ void qSortBlocksY(int min, int max);
 void qSortBlocksX(int min, int max);
 // Public Sub qSortBackgrounds(min As Integer, max As Integer) 'quicksort the backgrounds
 // quicksort the backgrounds
-void qSortBackgrounds(int min, int max);
+void qSortBackgrounds(int min, int max, bool use_x = true);
 
 // Public Sub FindBlocks() 'create a table of contents for blocks for an optimization
 // create a table of contents for blocks for an optimization
@@ -45,10 +45,11 @@ void qSortBackgrounds(int min, int max);
 // Super Block sorting / slow and only used when saving
 // void BlockSort2();
 // Public Sub BackgroundSort()
-void BackgroundSort();
+// void BackgroundSort();
+
 // Public Function BackGroundPri(A As Integer) As Double 'finds where the backgrounds should be put to set drawing priority
 // finds where the backgrounds should be put to set drawing priority
-double BackGroundPri(int A);
+// double BackGroundPri(int A);
 // Public Sub NPCSort()
 void NPCSort();
 // Public Sub FindSBlocks() 'sorts sizable blocks

@@ -193,6 +193,16 @@ void TouchScreenGFX_t::load()
     m_gfxPath = AppPath + "graphics/touchscreen/";
     loadAll();
 
+    // try loading from other paths if unsuccessful
+    for(const std::string& root : AppPathManager::assetsSearchPath())
+    {
+        if(m_success)
+            break;
+
+        m_gfxPath = root + "graphics/touchscreen/";
+        loadAll();
+    }
+
     if(m_success)
         pLogDebug("Loaded touchscreen GFX from %s", m_gfxPath.c_str());
     else
@@ -1033,7 +1043,7 @@ void TouchScreenController::updateScreenSize()
     XRender::getRenderSize(&m_renderWidth, &m_renderHeight);
 
     updateTouchMap(m_layout,
-                   m_screenWidth, m_screenHeight,
+                   m_renderWidth, m_renderHeight,
                    m_scale_factor,
                    m_scale_factor_dpad,
                    m_scale_factor_buttons,
@@ -1714,7 +1724,7 @@ StatusInfo InputMethod_TouchScreen::GetStatus()
 // the job of this function is to initialize the class in a consistent state
 InputMethodProfile_TouchScreen::InputMethodProfile_TouchScreen()
 {
-    // this->m_showPowerStatus = g_config.JoystickEnableBatteryStatus;
+    this->m_showPowerStatus = false;
 
 #ifdef __ANDROID__
     if(s_screenSize >= 9.0) // Big tablets

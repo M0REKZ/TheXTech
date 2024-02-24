@@ -41,7 +41,10 @@
 #include "game_globals.h"
 #include "menu_controls.h"
 
+#include "npc_traits.h"
+
 #include "main/trees.h"
+#include "script/luna/luna.h"
 
 #include "npc/npc_queues.h"
 
@@ -121,8 +124,8 @@ static void updateIntroLevelActivity()
 
                 for(int B : treeNPCQuery(tempLocation, SORTMODE_NONE))
                 {
-                    if(NPC[B].Active && !NPCIsABonus[NPC[B].Type] &&
-                       !NPCWontHurt[NPC[B].Type] && NPC[B].HoldingPlayer == 0)
+                    if(NPC[B].Active && !NPC[B]->IsABonus &&
+                       !NPC[B]->WontHurt && NPC[B].HoldingPlayer == 0)
                     {
                         if(CheckCollision(tempLocation, NPC[B].Location))
                         {
@@ -135,7 +138,7 @@ static void updateIntroLevelActivity()
 
             if(p.StandingOnNPC > 0)
             {
-                if(NPCGrabFromTop[NPC[p.StandingOnNPC].Type])
+                if(NPC[p.StandingOnNPC]->GrabFromTop)
                 {
                     p.Controls.Down = true;
                     p.Controls.Run = true;
@@ -155,8 +158,8 @@ static void updateIntroLevelActivity()
 
                 for(int B : treeNPCQuery(tempLocation, SORTMODE_NONE))
                 {
-                    if(NPC[B].Active && !NPCIsABonus[NPC[B].Type] &&
-                      !NPCWontHurt[NPC[B].Type] && NPC[B].HoldingPlayer == 0)
+                    if(NPC[B].Active && !NPC[B]->IsABonus &&
+                      !NPC[B]->WontHurt && NPC[B].HoldingPlayer == 0)
                     {
                         if(CheckCollision(tempLocation, NPC[B].Location))
                         {
@@ -180,8 +183,8 @@ static void updateIntroLevelActivity()
 
                     for(int B : treeNPCQuery(tempLocation, SORTMODE_NONE))
                     {
-                        if(NPC[B].Active && !NPCIsABonus[NPC[B].Type] &&
-                           !NPCWontHurt[NPC[B].Type] && NPC[B].HoldingPlayer == 0)
+                        if(NPC[B].Active && !NPC[B]->IsABonus &&
+                           !NPC[B]->WontHurt && NPC[B].HoldingPlayer == 0)
                         {
                             if(CheckCollision(tempLocation, NPC[B].Location))
                             {
@@ -201,8 +204,8 @@ static void updateIntroLevelActivity()
 
                     for(int B : treeNPCQuery(tempLocation, SORTMODE_NONE))
                     {
-                        if(NPC[B].Active && !NPCIsABonus[NPC[B].Type] &&
-                           !NPCWontHurt[NPC[B].Type] && NPC[B].HoldingPlayer == 0)
+                        if(NPC[B].Active && !NPC[B]->IsABonus &&
+                           !NPC[B]->WontHurt && NPC[B].HoldingPlayer == 0)
                         {
                             if(CheckCollision(tempLocation, NPC[B].Location))
                             {
@@ -239,7 +242,7 @@ static void updateIntroLevelActivity()
 //            if(A >= 1 && A <= 5)
             p.Character = g_gameInfo.introCharacterNext();
 
-            p.HeldBonus = 0;
+            p.HeldBonus = NPCID(0);
             p.Section = 0;
             p.Mount = 0;
             p.MountType = 0;
@@ -337,15 +340,15 @@ static void updateIntroLevelActivity()
                     {
                         do
                         {
-                            n.Type = iRand(286) + 1;
+                            n.Type = NPCID(iRand(286) + 1);
                         } while(n.Type == 11 || n.Type == 16 || n.Type == 18 || n.Type == 15 ||
                                 n.Type == 21 || n.Type == 12 || n.Type == 13 || n.Type == 30 ||
                                 n.Type == 17 || n.Type == 31 || n.Type == 32 ||
                                 (n.Type >= 37 && n.Type <= 44) || n.Type == 46 || n.Type == 47 ||
                                 n.Type == 50 || (n.Type >= 56 && n.Type <= 70) || n.Type == 8 ||
                                 n.Type == 74 || n.Type == 51 || n.Type == 52 || n.Type == 75 ||
-                                n.Type == 34 || NPCIsToad[n.Type] || NPCIsAnExit[n.Type] ||
-                                NPCIsYoshi[n.Type] || (n.Type >= 78 && n.Type <= 87) ||
+                                n.Type == 34 || NPCIsToad(n) || NPCIsAnExit(n) ||
+                                NPCIsYoshi(n) || (n.Type >= 78 && n.Type <= 87) ||
                                 n.Type == 91 || n.Type == 93 || (n.Type >= 104 && n.Type <= 108) ||
                                 n.Type == 125 || n.Type == 133 || (n.Type >= 148 && n.Type <= 151) ||
                                 n.Type == 159 || n.Type == 160 || n.Type == 164 || n.Type == 168 ||
@@ -356,7 +359,7 @@ static void updateIntroLevelActivity()
                                 n.Type == 192 || n.Type == 196 ||
                                 // Duplicated segment, .....! [PVS Studio]
                                 // n.Type == 197 ||
-                                (UnderWater[0] && NPCIsBoot[n.Type]) ||
+                                (UnderWater[0] && NPCIsBoot(n)) ||
                                 (n.Type >= 198 && n.Type <= 228) || n.Type == 234);
 
                     } while(n.Type == 235 || n.Type == 231 || n.Type == 179 || n.Type == 49 ||
@@ -370,8 +373,8 @@ static void updateIntroLevelActivity()
 
                     n.Active = true;
                     n.HoldingPlayer = A;
-                    n.Location.Height = NPCHeight[n.Type];
-                    n.Location.Width = NPCWidth[n.Type];
+                    n.Location.Height = n->THeight;
+                    n.Location.Width = n->TWidth;
                     n.Location.Y = Player[A].Location.Y;  // level[n.Section].Height + 1000
                     n.Location.X = Player[A].Location.X; // level[n.Section].X + 1000
                     n.TimeLeft = 100;
@@ -509,6 +512,8 @@ static void updateIntroLevelActivity()
 
 void MenuLoop()
 {
+    lunaLoop();
+
     // ConnectScreen and ControlsSettings screens handles its own input method polling
     if(MenuMode != MENU_CHARACTER_SELECT_NEW && MenuMode != MENU_INPUT_SETTINGS && !g_pollingInput)
         Controls::PollInputMethod();
@@ -542,7 +547,7 @@ void MenuLoop()
 
     if(SharedCursor.Primary)
     {
-        const Location_t cursorLoc = newLoc(SharedCursor.X - vScreen[1].X - vScreen[1].ScreenLeft, SharedCursor.Y - vScreen[1].Y - vScreen[1].ScreenTop);
+        const Location_t cursorLoc = newLoc(SharedCursor.X - vScreen[1].X - vScreen[1].TargetX(), SharedCursor.Y - vScreen[1].Y - vScreen[1].TargetY());
         if(iRand(5) >= 2)
         {
             NewEffect(EFFID_SPARKLE, cursorLoc);
@@ -556,7 +561,7 @@ void MenuLoop()
             {
                 if(CheckCollision(cursorLoc, NPC[A].Location))
                 {
-                    if(!NPCIsACoin[NPC[A].Type])
+                    if(!NPC[A]->IsACoin)
                     {
                         NPC[0] = NPC[A];
                         NPC[0].Location.X = SharedCursor.X - vScreen[1].X - vScreen[1].ScreenLeft;

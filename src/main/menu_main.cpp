@@ -64,12 +64,15 @@
 #include "core/language.h"
 #include "main/translate.h"
 #include "fontman/font_manager.h"
+#include "custom.h"
 
 #include "video.h"
 #include "editor.h"
 #include "frm_main.h"
 
 #include "screen_textentry.h"
+#include "main/asset_pack.h"
+#include "main/screen_asset_pack.h"
 #include "editor/new_editor.h"
 #include "editor/write_level.h"
 #include "editor/write_world.h"
@@ -116,7 +119,7 @@ void initMainMenu()
 
     g_mainMenu.introPressStart = "Press Start";
 
-    g_mainMenu.mainStartGame = "Start Game";
+    g_mainMenu.mainPlayEpisode = "Play Episode";
     g_mainMenu.main1PlayerGame = "1 Player Game";
     g_mainMenu.mainMultiplayerGame = "2 Player Game";
     g_mainMenu.mainBattleGame = "Battle Game";
@@ -227,38 +230,50 @@ static int menuRecentEpisode = -1;
 static int listMenuLastScroll = 0;
 static int listMenuLastCursor = 0;
 
+static int s_startAssetPackTimer = 0;
+
 static const int TinyScreenH = 400;
 static const int SmallScreenH = 500;
 static const int TinyScreenW = 600;
 
+static bool s_prefer_modern_char_sel()
+{
+    return (CompatGetLevel() < COMPAT_SMBX2);
+}
+
+static bool s_show_separate_2P()
+{
+    return !s_prefer_modern_char_sel() && !g_gameInfo.disableTwoPlayer;
+}
+
 void GetMenuPos(int* MenuX, int* MenuY)
 {
     if(MenuX)
-        *MenuX = ScreenW / 2 - 100;
+        *MenuX = XRender::TargetW / 2 - 100;
 
     if(MenuY)
-        *MenuY = ScreenH - 250;
+        *MenuY = XRender::TargetH - 250;
 
     // tweaks for MenuX
-    if(MenuX && ScreenW < TinyScreenW)
+    if(MenuX && XRender::TargetW < TinyScreenW)
     {
-        *MenuX = ScreenW / 2 - 240;
-        if(*MenuX < 24)
-            *MenuX = 24;
+        *MenuX = XRender::TargetW / 2 - 240;
+        if(*MenuX < 24 + XRender::TargetOverscanX)
+            *MenuX = 24 + XRender::TargetOverscanX;
     }
 
     // the rest is tweaks for MenuY
     if(!MenuY)
         return;
 
-    if(ScreenH < TinyScreenH)
+    if(XRender::TargetH < TinyScreenH)
         *MenuY = 100;
-    else if(ScreenH < SmallScreenH)
+    else if(XRender::TargetH < SmallScreenH)
     {
         if(MenuMode == MENU_OPTIONS)
-            *MenuY = ScreenH - 250;
+            *MenuY = XRender::TargetH - 250;
         else
-            *MenuY = ScreenH - 220;
+            *MenuY = XRender::TargetH - 220;
     }
 
     if(MenuMode >= MENU_SELECT_SLOT_BASE && MenuMode < MENU_SELECT_SLOT_END)
@@ -309,7 +324,7 @@ static int FindWorldsThread(void *)
 }
 #endif
 
-#if (defined(__APPLE__) && defined(USE_BUNDLED_ASSETS)) || defined(FIXED_ASSETS_PATH)
+#if (defined(__APPLE__) && defined(USE_BUNDLED_ASSETS)) || defined(FIXED_ASSETS_PATH) || defined(__EMSCRIPTEN__)
 #   define CAN_WRITE_APPPATH_WORLDS false
 #else
 #   define CAN_WRITE_APPPATH_WORLDS true
@@ -338,13 +353,13 @@ void FindWorlds()
     };
 
     if(AppPathManager::userDirIsAvailable())
+    {
+        // assume that assets are not writable
         worldRoots.push_back({AppPathManager::userWorldsRootDir(), true});
+        worldRoots[0].editable = false;
+    }
 
 #ifdef APP_PATH_HAS_EXTRA_WORLDS
-    // can't edit base assets if they're a romfs package (different from the user dir)
-    if(AppPathManager::userDirIsAvailable())
-        worldRoots[0].editable = false;
-
     // add worlds from additional romfs packages
     for(const std::string& root : AppPathManager::worldRootDirs())
         worldRoots.push_back({root, false});
@@ -519,7 +534,11 @@ void FindLevels()
     };
 
     if(AppPathManager::userDirIsAvailable())
+    {
+        // assume that assets are not writable
         battleRoots.push_back({AppPathManager::userBattleRootDir(), true});
+        battleRoots[0].editable = false;
+    }
 
     SelectBattle.clear();
     SelectBattle.emplace_back(SelectWorld_t()); // Dummy entry
@@ -568,9 +587,6 @@ void FindLevels()
     }
 
     NumSelectBattle = ((int)SelectBattle.size() - 1);
-#ifndef PGE_NO_THREADING
-    SDL_AtomicSet(&loading, 0);
-#endif
 
     if(SelectBattle.size() <= 2) // No available levels in the list
     {
@@ -582,6 +598,10 @@ void FindLevels()
         SelectBattle[1].WorldName = g_mainMenu.gameNoBattleLevels;
         SelectBattle[1].disabled = true;
     }
+
+#ifndef PGE_NO_THREADING
+    SDL_AtomicSet(&loading, 0);
+#endif
 }
 
 
@@ -604,6 +624,12 @@ static void s_handleMouseMove(int items, int x, int y, int maxWidth, int itemHei
             }
         }
     }
+}
+
+
+static bool s_can_enter_ap_screen()
+{
+    return MenuMode == MENU_INTRO || (XRender::TargetH >= TinyScreenH && MenuMode == MENU_MAIN);
 }
 
 
@@ -646,6 +672,31 @@ bool mainMenuUpdate()
 
     if(menuBackPress && menuDoPress)
         menuDoPress = false;
+
+    bool should_enter_ap_screen = homePressed && s_can_enter_ap_screen() && MenuCursorCanMove;
+
+    if(should_enter_ap_screen && GetAssetPacks().size() <= 1)
+    {
+        PlaySoundMenu(SFX_BlockHit);
+        MenuCursorCanMove = false;
+    }
+
+    if(should_enter_ap_screen && GetAssetPacks().size() > 1)
+    {
+        s_startAssetPackTimer++;
+        if(s_startAssetPackTimer == 60)
+        {
+            PlaySoundMenu(SFX_Do);
+            FadeOutMusic(500);
+            ScreenAssetPack::g_LoopActive = true;
+            GameMenu = false;
+            return true;
+        }
+    }
+    else if(s_can_enter_ap_screen() && s_startAssetPackTimer > 0)
+        s_startAssetPackTimer -= 2;
+    else
+        s_startAssetPackTimer = 0;
 
     {
         if(XWindow::getCursor() != CURSOR_NONE)
@@ -713,7 +764,7 @@ bool mainMenuUpdate()
 
         } // No keyboard/Joystick grabbing active
 
-        if(MenuMode == MENU_INTRO && ScreenH >= TinyScreenH)
+        if(MenuMode == MENU_INTRO && XRender::TargetH >= TinyScreenH)
             MenuMode = MENU_MAIN;
 
 #ifndef PGE_NO_THREADING
@@ -736,7 +787,7 @@ bool mainMenuUpdate()
             if(menuBackPress && MenuCursorCanMove)
             {
                 int quitKeyPos = 2;
-                if(!g_gameInfo.disableTwoPlayer)
+                if(s_show_separate_2P())
                     quitKeyPos ++;
                 if(!g_gameInfo.disableBattleMode)
                     quitKeyPos ++;
@@ -757,7 +808,7 @@ bool mainMenuUpdate()
             }
         }
         // Main Menu
-        if(MenuMode == MENU_MAIN)
+        else if(MenuMode == MENU_MAIN)
         {
             if(SharedCursor.Move)
             {
@@ -767,8 +818,8 @@ bool mainMenuUpdate()
                     {
                         int i = 0;
                         if(A == i++)
-                            menuLen = 18 * (g_gameInfo.disableTwoPlayer ? (int)g_mainMenu.main1PlayerGame.size() : (int)g_mainMenu.mainStartGame.size()) - 2;
-                        else if(!g_gameInfo.disableTwoPlayer && A == i++)
+                            menuLen = 18 * (s_show_separate_2P() ? (int)g_mainMenu.main1PlayerGame.size() : (int)g_mainMenu.mainPlayEpisode.size()) - 2;
+                        else if(s_show_separate_2P() && A == i++)
                             menuLen = 18 * (int)g_mainMenu.mainMultiplayerGame.size() - 2;
                         else if(!g_gameInfo.disableBattleMode && A == i++)
                             menuLen = 18 * (int)g_mainMenu.mainBattleGame.size();
@@ -799,14 +850,14 @@ bool mainMenuUpdate()
             if(menuBackPress && MenuCursorCanMove)
             {
                 int quitKeyPos = 2;
-                if(!g_gameInfo.disableTwoPlayer)
+                if(s_show_separate_2P())
                     quitKeyPos ++;
                 if(!g_gameInfo.disableBattleMode)
                     quitKeyPos ++;
                 if(g_config.enable_editor)
                     quitKeyPos ++;
 
-                if(ScreenH < TinyScreenH)
+                if(XRender::TargetH < TinyScreenH)
                 {
                     MenuCursorCanMove = false;
                     MenuMode = MENU_INTRO;
@@ -815,6 +866,7 @@ bool mainMenuUpdate()
                 else if(MenuCursor != quitKeyPos)
                 {
                     MenuCursor = quitKeyPos;
+                    MenuCursorCanMove = false;
                     PlaySoundMenu(SFX_Slide);
                 }
             }
@@ -842,7 +894,7 @@ bool mainMenuUpdate()
                     SDL_DetachThread(loadingThread);
 #endif
                 }
-                else if(!g_gameInfo.disableTwoPlayer && MenuCursor == i++)
+                else if(s_show_separate_2P() && MenuCursor == i++)
                 {
                     PlaySoundMenu(SFX_Do);
                     MenuMode = MENU_2PLAYER_GAME;
@@ -876,7 +928,7 @@ bool mainMenuUpdate()
                 }
                 else if(g_config.enable_editor && MenuCursor == i++)
                 {
-                    if(ScreenW < 640 || ScreenH < 480)
+                    if(XRender::TargetW < 640 || XRender::TargetH < 480)
                     {
                         PlaySoundMenu(SFX_BlockHit);
                         MessageText = g_mainMenu.editorErrorResolution;
@@ -937,7 +989,7 @@ bool mainMenuUpdate()
 
 
             int quitKeyPos = 2;
-            if(!g_gameInfo.disableTwoPlayer)
+            if(s_show_separate_2P())
                 quitKeyPos ++;
             if(!g_gameInfo.disableBattleMode)
                 quitKeyPos ++;
@@ -964,6 +1016,8 @@ bool mainMenuUpdate()
                 }
                 else
                 {
+                    UnloadCustomPlayerPreviews();
+
                     MenuCursor = selSave - 1;
                     if(menuPlayersNum == 1)
                         MenuMode = MENU_SELECT_SLOT_1P;
@@ -1226,12 +1280,12 @@ bool mainMenuUpdate()
 
                     if(MenuMode == MENU_BATTLE_MODE)
                     {
-                        MenuCursor = g_gameInfo.disableTwoPlayer ? 1 : 2;
+                        MenuCursor = !s_show_separate_2P() ? 1 : 2;
                     }
                     else if(MenuMode == MENU_EDITOR)
                     {
                         MenuCursor = 3;
-                        if(g_gameInfo.disableTwoPlayer)
+                        if(!s_show_separate_2P())
                             MenuCursor--;
                         if(g_gameInfo.disableBattleMode)
                             MenuCursor--;
@@ -1302,6 +1356,7 @@ bool mainMenuUpdate()
 #else
                                 SDL_AtomicSet(&loading, 1);
                                 loadingThread = SDL_CreateThread(FindWorldsThread, "FindWorlds", NULL);
+                                SDL_DetachThread(loadingThread);
 #endif
                             }
                         }
@@ -1376,35 +1431,22 @@ bool mainMenuUpdate()
                             return true;
                         }
                     }
-                    // game mode
+                    // battle mode
+                    else if(MenuMode == MENU_BATTLE_MODE)
+                    {
+                        MenuMode = MENU_CHARACTER_SELECT_NEW_BM;
+                        ConnectScreen::MainMenu_Start(2);
+                    }
+                    // enter save select
                     else
                     {
-                        if(MenuMode != MENU_BATTLE_MODE)
-                            FindSaves();
-
-                        For(A, 1, numCharacters)
-                        {
-                            if(MenuMode == MENU_BATTLE_MODE)
-                                blockCharacter[A] = false;
-                            else
-                                blockCharacter[A] = SelectWorld[selWorld].blockChar[A];
-                        }
-
-                        if(MenuMode == MENU_BATTLE_MODE)
-                        {
-                            MenuMode = MENU_CHARACTER_SELECT_NEW_BM;
-                            ConnectScreen::MainMenu_Start(2);
-                        }
-                        else
-                        {
-                            MenuMode *= MENU_SELECT_SLOT_BASE;
-                            MenuCursor = 0;
-                        }
+                        FindSaves();
+                        MenuMode *= MENU_SELECT_SLOT_BASE;
+                        MenuCursor = 0;
                     }
 
                     MenuCursorCanMove = false;
                 }
-
             }
 
             // New world select scroll options!
@@ -1503,11 +1545,15 @@ bool mainMenuUpdate()
 
                     if(MenuCursor >= 0 && MenuCursor <= c_menuItemSavesEndList) // Select the save slot, but still need to select players
                     {
+                        LoadCustomPlayerPreviews(SelectWorld[selWorld].WorldPath.c_str());
+
                         selSave = MenuCursor + 1;
                         if(MenuMode == MENU_SELECT_SLOT_2P)
                             ConnectScreen::MainMenu_Start(2);
-                        else
+                        else if(s_prefer_modern_char_sel())
                             ConnectScreen::MainMenu_Start(1);
+                        else
+                            ConnectScreen::LegacyMenu_Start();
                         MenuMode = MENU_CHARACTER_SELECT_NEW;
                         MenuCursorCanMove = false;
                     }
@@ -1702,7 +1748,7 @@ bool mainMenuUpdate()
                     SaveConfig();
 
                     int optionsIndex = 1;
-                    if(!g_gameInfo.disableTwoPlayer)
+                    if(s_show_separate_2P())
                         optionsIndex++;
                     if(!g_gameInfo.disableBattleMode)
                         optionsIndex++;
@@ -1859,7 +1905,7 @@ bool mainMenuUpdate()
                         PlaySoundMenu(SFX_Do);
                         GameMenu = false;
                         GameOutro = true;
-                        CreditChop = ScreenH / 2;
+                        CreditChop = XRender::TargetH / 2;
                         EndCredits = 0;
                         SetupCredits();
                     }
@@ -1961,7 +2007,7 @@ static constexpr int find_in_string(const char* haystack, char needle)
     return find_in_string(haystack, haystack, needle);
 }
 
-static void s_drawGameVersion()
+void drawGameVersion(bool disable_git)
 {
     constexpr bool is_release = !in_string(V_LATEST_STABLE, '-');
     constexpr bool is_main = str_prefix(V_BUILD_BRANCH, "main");
@@ -1970,36 +2016,36 @@ static void s_drawGameVersion()
 
     constexpr bool is_dirty = in_string(V_BUILD_VER, '-');
 
-    constexpr bool show_branch = (!is_main && (is_release || !is_stable));
+    constexpr bool show_branch = (!is_main && !(is_release && is_stable));
     constexpr bool show_commit = (!is_release || (!is_main && !is_stable));
 
     // show version
-    SuperPrintRightAlign("v" V_LATEST_STABLE, 5, ScreenW - 2, 2);
+    SuperPrintRightAlign("v" V_LATEST_STABLE, 5, XRender::TargetW - XRender::TargetOverscanX - 2, 2);
 
     // show branch
-    if(show_branch)
+    if(show_branch && !disable_git)
     {
-        int y = show_commit ? ScreenH - 36 : ScreenH - 18;
+        int y = show_commit ? XRender::TargetH - 36 : XRender::TargetH - 18;
 
         if(is_wip)
         {
             // strip the "wip-"
-            SuperPrintRightAlign(&V_BUILD_BRANCH[find_in_string(V_BUILD_BRANCH, '-') + 1], 5, ScreenW - 2, y);
+            SuperPrintRightAlign(&V_BUILD_BRANCH[find_in_string(V_BUILD_BRANCH, '-') + 1], 5, XRender::TargetW - XRender::TargetOverscanX - 2, y);
         }
         else
-            SuperPrintRightAlign(V_BUILD_BRANCH, 5, ScreenW - 2, y);
+            SuperPrintRightAlign(V_BUILD_BRANCH, 5, XRender::TargetW - XRender::TargetOverscanX - 2, y);
     }
 
     // show git commit
-    if(show_commit)
+    if(show_commit && !disable_git)
     {
         if(is_dirty)
         {
             // only show -d, not -dirty
-            SuperPrintRightAlign(find_in_string(V_BUILD_VER, '-') + 2 + 1, "#" V_BUILD_VER, 5, ScreenW - 2, ScreenH - 18);
+            SuperPrintRightAlign(find_in_string(V_BUILD_VER, '-') + 2 + 1, "#" V_BUILD_VER, 5, XRender::TargetW - XRender::TargetOverscanX - 2, XRender::TargetH - 18);
         }
         else
-            SuperPrintRightAlign("#" V_BUILD_VER, 5, ScreenW - 2, ScreenH - 18);
+            SuperPrintRightAlign("#" V_BUILD_VER, 5, XRender::TargetW - XRender::TargetOverscanX - 2, XRender::TargetH - 18);
     }
 }
 
@@ -2011,13 +2057,12 @@ static void s_drawGameTypeTitle(int x, int y)
         SuperPrint(g_mainMenu.mainBattleGame, 3, x, y, XTColorF(0.3f, 0.3f, 1.0f));
     else
     {
-        float r = menuPlayersNum == 1 ? 1.f : 0.3f;
-        float g = menuPlayersNum == 2 ? 1.f : 0.3f;
-
-        if(menuPlayersNum == 1)
-            SuperPrint(g_mainMenu.main1PlayerGame, 3, x, y, XTColorF(r, g, 0.3f));
+        if(!s_show_separate_2P())
+            SuperPrint(g_mainMenu.mainPlayEpisode, 3, x, y, XTColorF(1.0f, 0.3f, 0.3f));
+        else if(menuPlayersNum == 1)
+            SuperPrint(g_mainMenu.main1PlayerGame, 3, x, y, XTColorF(1.0f, 0.3f, 0.3f));
         else
-            SuperPrint(g_mainMenu.mainMultiplayerGame, 3, x, y, XTColorF(r, g, 0.3f));
+            SuperPrint(g_mainMenu.mainMultiplayerGame, 3, x, y, XTColorF(0.3f, 1.0f, 0.3f));
     }
 }
 
@@ -2072,7 +2117,7 @@ static void s_drawGameSaves(int MenuX, int MenuY)
 
     const auto& info = SaveSlotInfo[MenuCursor + 1];
 
-    int infobox_x = ScreenW / 2 - 240;
+    int infobox_x = XRender::TargetW / 2 - 240;
     int infobox_y = MenuY + 145 + c_menuSavesOffsetY;
 
     int row_1 = infobox_y + 10;
@@ -2110,9 +2155,7 @@ static void s_drawGameSaves(int MenuX, int MenuY)
     int row_lc = (hasFails) ? row_1 : row_c;
 
     // Print lives on the screen (from gfx_update2.cpp)
-    XRender::renderTexture(infobox_x + 272, row_lc + 2 + 14 - GFX.Interface[3].h, GFX.Interface[3]);
-    XRender::renderTexture(infobox_x + 272 + 40, row_lc + 2 + 16 - GFX.Interface[3].h, GFX.Interface[1]);
-    SuperPrint(t = std::to_string(info.Lives), 1, infobox_x + 272 + 62, row_lc + 2);
+    DrawLives(infobox_x + 272 + 32, row_lc, info.Lives, info.Hundreds);
 
     // Print coins on the screen (from gfx_update2.cpp)
     int coins_x = infobox_x + 480 - 10 - 36 - 62;
@@ -2144,55 +2187,64 @@ void mainMenuDraw()
 
     // Render the permanent menu graphics (curtain, URL, logo)
 
-    // Curtain
-    // correction to loop the original asset properly
-    int A = GFX.MenuGFX[1].w;
-    if(A == 800)
-        A = 768;
-    // horizReps
-    B = ScreenW / A + 2;
-
-    double x = 0;
-
-    for(int C = 0; C < B; C++)
-        XRender::renderTexture(x + A * C, 0, A, GFX.MenuGFX[1].h, GFX.MenuGFX[1], 0, 0);
-
     // URL
-    if(ScreenH >= SmallScreenH)
-        XRender::renderTexture(ScreenW / 2 - GFX.MenuGFX[3].w / 2, ScreenH - 24,
-                GFX.MenuGFX[3].w, GFX.MenuGFX[3].h, GFX.MenuGFX[3], 0, 0);
+    if(XRender::TargetH >= SmallScreenH)
+        XRender::renderTexture(XRender::TargetW / 2 - GFX.MenuGFX[3].w / 2, XRender::TargetH - 24, GFX.MenuGFX[3]);
 
-    // game logo
-    int LogoMode = 0;
-    if(ScreenH >= TinyScreenH || MenuMode == MENU_INTRO)
-        LogoMode = 1;
-    else if(MenuMode == MENU_MAIN || MenuMode == MENU_OPTIONS)
-        LogoMode = 2;
+    bool draw_in_asset_pack = (MenuMode == MENU_MAIN || MenuMode == MENU_INTRO) && s_startAssetPackTimer >= 2;
 
-    if(LogoMode == 1)
+    if(!draw_in_asset_pack)
     {
-        // show at half opacity if not at main menu on a small screen
-        XTColor logo_tint = (ScreenH < SmallScreenH && MenuMode != MENU_INTRO && MenuMode != MENU_MAIN) ? XTAlpha(127) : XTColor();
+        // Curtain
+        // correction to loop the original asset properly
+        int curtain_draw_w = GFX.MenuGFX[1].w;
+        if(curtain_draw_w == 800)
+            curtain_draw_w = 768;
+        int curtain_horiz_reps = XRender::TargetW / curtain_draw_w + 2;
 
-        int logo_y = ScreenH / 2 - 230;
+        for(int i = 0; i < curtain_horiz_reps; i++)
+            XRender::renderTexture(curtain_draw_w * i, 0, curtain_draw_w, GFX.MenuGFX[1].h, GFX.MenuGFX[1], 0, 0);
 
-        // place manually on small screens
-        if(ScreenH < SmallScreenH)
-            logo_y = 16;
-        else if(ScreenH <= 600)
-            logo_y = 40;
+        // game logo
+        int LogoMode = 0;
+        if(XRender::TargetH >= TinyScreenH || MenuMode == MENU_INTRO)
+            LogoMode = 1;
+        else if(MenuMode == MENU_MAIN || MenuMode == MENU_OPTIONS)
+            LogoMode = 2;
 
-        XRender::renderTexture(ScreenW / 2 - GFX.MenuGFX[2].w / 2, logo_y, GFX.MenuGFX[2], logo_tint);
+        if(LogoMode == 1)
+        {
+            // show at half opacity if not at main menu on a small screen
+            XTColor logo_tint = (XRender::TargetH < SmallScreenH && MenuMode != MENU_INTRO && MenuMode != MENU_MAIN) ? XTAlpha(127) : XTColor();
+
+            int logo_y = XRender::TargetH / 2 - 230;
+
+            // place manually on small screens
+            if(XRender::TargetH < SmallScreenH)
+                logo_y = 16;
+            else if(XRender::TargetH <= 600)
+                logo_y = 40;
+
+            XRender::renderTexture(XRender::TargetW / 2 - GFX.MenuGFX[2].w / 2, logo_y, GFX.MenuGFX[2], logo_tint);
+        }
+        else if(LogoMode == 2)
+        {
+            SuperPrint(g_gameInfo.title, 3, XRender::TargetW / 2 - g_gameInfo.title.length()*9, 30);
+        }
     }
-    else if(LogoMode == 2)
+
+
+    drawGameVersion(false);
+
+    // Menu Intro
+    if(MenuMode == MENU_INTRO)
     {
-        SuperPrint(g_gameInfo.title, 3, ScreenW/2 - g_gameInfo.title.length()*9, 30);
+        if((CommonFrame % 90) < 45)
+            SuperPrintScreenCenter(g_mainMenu.introPressStart, 3, (16 + 240 + XRender::TargetH - 48) / 2);
     }
-
-
-    s_drawGameVersion();
 
 #ifndef PGE_NO_THREADING
+    // loading (can't safely render)
     if(SDL_AtomicGet(&loading))
     {
         if(SDL_AtomicGet(&loadingProgrssMax) <= 0)
@@ -2205,19 +2257,14 @@ void mainMenuDraw()
     }
     else
 #endif
+    // DO NOT DETACH THE ABOVE ELSE STATEMENT FROM THE FOLLOWING SERIES OF IF CLAUSES
 
-    // Menu Intro
-    if(MenuMode == MENU_INTRO)
-    {
-        if((CommonFrame % 90) < 45)
-            SuperPrint(g_mainMenu.introPressStart, 3, ScreenW/2 - g_mainMenu.introPressStart.length()*9, ScreenH - 40);
-    }
     // Main menu
     if(MenuMode == MENU_MAIN)
     {
         int i = 0;
-        SuperPrint(g_gameInfo.disableTwoPlayer ? g_mainMenu.mainStartGame : g_mainMenu.main1PlayerGame, 3, MenuX, MenuY+30*(i++));
-        if(!g_gameInfo.disableTwoPlayer)
+        SuperPrint(s_show_separate_2P() ? g_mainMenu.main1PlayerGame : g_mainMenu.mainPlayEpisode, 3, MenuX, MenuY+30*(i++));
+        if(s_show_separate_2P())
             SuperPrint(g_mainMenu.mainMultiplayerGame, 3, MenuX, MenuY+30*(i++));
         if(!g_gameInfo.disableBattleMode)
             SuperPrint(g_mainMenu.mainBattleGame, 3, MenuX, MenuY+30*(i++));
@@ -2232,6 +2279,10 @@ void mainMenuDraw()
     else if(MenuMode == MENU_CHARACTER_SELECT_NEW ||
             MenuMode == MENU_CHARACTER_SELECT_NEW_BM)
     {
+        s_drawGameTypeTitle(MenuX, MenuY - 70);
+        const auto& world_list = (MenuMode == MENU_CHARACTER_SELECT_NEW) ? SelectWorld : SelectBattle;
+        SuperPrint(world_list[selWorld].WorldName, 3, MenuX, MenuY - 40, XTColorF(0.6f, 1.f, 1.f));
+
         ConnectScreen::Render();
     }
 #if 0 // dead now
@@ -2370,10 +2421,10 @@ void mainMenuDraw()
 
         // render the scroll indicators
         if(minShow > 1)
-            XRender::renderTexture(ScreenW/2 - 8, MenuY - 20, GFX.MCursor[1]);
+            XRender::renderTexture(XRender::TargetW/2 - 8, MenuY - 20, GFX.MCursor[1]);
 
         if(maxShow < original_maxShow)
-            XRender::renderTexture(ScreenW/2 - 8, MenuY + 140, GFX.MCursor[2]);
+            XRender::renderTexture(XRender::TargetW/2 - 8, MenuY + 140, GFX.MCursor[2]);
 
         B = MenuCursor - minShow + 1;
 
@@ -2504,6 +2555,13 @@ void mainMenuDraw()
     else if(MenuMode == MENU_INPUT_SETTINGS)
     {
         menuControls_Render();
+    }
+
+    // fade to / from asset pack screen
+    if(s_can_enter_ap_screen() && s_startAssetPackTimer > 0)
+    {
+        ScreenAssetPack::DrawBackground(s_startAssetPackTimer / 60.0);
+        g_levelScreenFader.clearFader();
     }
 
     // Mouse cursor

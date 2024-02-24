@@ -131,7 +131,7 @@ void DrawMessage(const std::string& SuperText);
 void DrawMessage(const UTF8CharMap_t& SuperTextMap);
 
 // Public Sub SetRes()
-void SetRes();
+// void SetRes(); //deprecated
 // Public Function CheckKey(newStrizzle As String) As String
 //std::string CheckKey(std::string newStrizzle); // USELESS
 
@@ -160,6 +160,15 @@ void DrawCredits();
 // Public Sub DrawInterface(Z As Integer, numScreens) 'draws the games interface
 // draws the games interface
 void DrawInterface(int Z, int numScreens);
+
+/*!
+ * \brief NEW: draws the lives / 100s count
+ * \param X      the *right* side of the 1UP / 100 icon
+ * \param Y      top Y coordinate
+ * \param lives  lives count to draw
+ * \param hunds  100s count to draw
+ */
+void DrawLives(int X, int Y, int lives, int hunds);
 
 /*!
  * \brief NEW: draws a set of medals onscreen

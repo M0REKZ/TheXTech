@@ -76,6 +76,18 @@ struct vScreen_t : public qScreen_t
 
     // NEW: which player is associated with the vScreen. IMPORTANT: unused when shared screen mode is active
     uint8_t player = 0;
+
+    //! left x-coordinate for drawing on the currently active render target
+    int TargetX() const;
+
+    //! top y-coordinate for start drawing on the currently active render target
+    int TargetY() const;
+
+    //! x-offset to add for render calls (based on X, but may be rounded)
+    double CameraAddX() const;
+
+    //! Y-offset to add for render calls (based on Y, but may be rounded)
+    double CameraAddY() const;
 };
 
 constexpr int c_screenCount = 2;
@@ -192,6 +204,12 @@ public:
 
     //! Bound on active vScreen indexes (0-indexed). Use to replace numScreens logic.
     int active_end() const;
+
+    //! left x-coordinate for drawing on the currently active render target
+    int TargetX() const;
+
+    //! top y-coordinate for start drawing on the currently active render target
+    int TargetY() const;
 };
 
 void InitScreens();
@@ -235,9 +253,9 @@ extern Screen_t* l_screen;
 // extern int& DScreenType;
 
 //Public ScreenType As Integer 'The screen/view type
-extern int& ScreenW;
+// extern int& ScreenW;
 //Public DScreenType As Integer 'The dynamic screen setup
-extern int& ScreenH;
+// extern int& ScreenH;
 #endif
 
 #endif // #ifndef SCREEN_HHH

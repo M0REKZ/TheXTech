@@ -19,12 +19,24 @@
  */
 
 #pragma once
-#ifndef TXT_INIT_SDL_H
-#define TXT_INIT_SDL_H
 
-#include "cmd_line_setup.h"
+#ifndef ENUMNPCEFFECT_HHH
+#define ENUMNPCEFFECT_HHH
 
-bool TXT_InitSDL(const CmdLineSetup_t &setup);
-void TXT_QuitSDL();
+#include "global_constants.h"
 
-#endif // TXT_INIT_SDL_H
+enum NPCEffect : vbint_t
+{
+    NPCEFF_NORMAL = 0,
+    NPCEFF_EMERGE_UP = 1,
+    NPCEFF_DROP_ITEM = 2,
+    NPCEFF_EMERGE_DOWN = 3,
+    NPCEFF_WARP = 4,
+    NPCEFF_PET_TONGUE = 5,
+    NPCEFF_PET_INSIDE = 6,
+    NPCEFF_WAITING = 8,
+    NPCEFF_ENCASED = 208,
+};
+
+
+#endif // ENUMNPCEFFECT_HHH

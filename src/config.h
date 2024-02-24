@@ -34,8 +34,6 @@ extern struct Config_t
     bool    use_native_osk = false;
     //! Enable the in-game editor
     bool    enable_editor = true;
-    //! Scroll when cursor is at edge of screen in editor
-    bool    editor_edge_scroll = false;
     //! Preferred file format for editor (0 is Moondust engine lvlx format)
     int     editor_preferred_file_format = 0;
     //! User's preferred language / dialect
@@ -43,8 +41,6 @@ extern struct Config_t
 
     /* ---- Video ----*/
 
-    //! The onscreen keyboard should fill the screen
-    bool    osk_fill_screen = false;
     //! Show the episode title onscreen
     enum
     {
@@ -74,6 +70,8 @@ extern struct Config_t
     int     WorldMapStarShowPolicyGlobal = 0;
     //! Policy of medals showing
     int     medals_show_policy = MEDALS_SHOW_OFF;
+    //! Show fails counter
+    bool    show_fails_counter = true;
     //! Use the quick (non-pausing) reconnect screen
     bool    NoPauseReconnect = false;
     //! Allow player quickly move through paths on the world map (works for compatibility Mode 1 only)
@@ -111,15 +109,6 @@ extern struct Config_t
     static constexpr bool autocode_translate_coords = true;
     //! Camera optimizations that improve the experience at low resolutions
     static constexpr bool small_screen_camera_features = true;
-
-
-    /* ---- Joystick ----*/
-
-    //! Enable usage of the rumble control. Only affects new controller profiles.
-    // bool    JoystickEnableRumble = true;
-    //! Show the battery status for wireless gamepads (if possible). Only affects new controller profiles.
-    // bool    JoystickEnableBatteryStatus = false;
-
 
 } g_config; // main_config.cpp
 

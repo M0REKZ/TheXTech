@@ -49,6 +49,7 @@
 #include "main/screen_progress.h"
 #include "main/game_strings.h"
 #include "trees.h"
+#include "npc_traits.h"
 #include "npc_special_data.h"
 #include "graphics/gfx_camera.h"
 #include "graphics/gfx_update.h"
@@ -76,32 +77,6 @@
 #    include "core/opengl/gl_program_bank.h"
 #endif
 
-
-void bgoApplyZMode(Background_t *bgo, int smbx64sp)
-{
-    if(bgo->zMode == LevelBGO::ZDefault)
-        bgo->SortPriority = smbx64sp;
-    else
-    {
-        switch(bgo->zMode)
-        {
-        case LevelBGO::Background2:
-            bgo->SortPriority = 10;
-            break;
-        case LevelBGO::Background1:
-            bgo->SortPriority = 30;
-            break;
-        case LevelBGO::Foreground1:
-            bgo->SortPriority = 125;
-            break;
-        case LevelBGO::Foreground2:
-            bgo->SortPriority = 200;
-            break;
-        default:
-            break;
-        }
-    }
-}
 
 void addMissingLvlSuffix(std::string &fileName)
 {
@@ -204,7 +179,7 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
 
     bool compatModern = (CompatGetLevel() == COMPAT_MODERN);
     bool isSmbx64 = (lvl.meta.RecentFormat == LevelData::SMBX64);
-    int  fVersion = lvl.meta.RecentFormatVersion;
+    // int  fVersion = lvl.meta.RecentFormatVersion;
 
     if(!FilePath.empty())
     {
@@ -618,10 +593,10 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
         block.forceSmashable = false;
         if(b.id == 90)
         {
-            if(lvl.meta.RecentFormat == LevelData::SMBX64 && lvl.meta.RecentFormatVersion < 20)
-                block.forceSmashable = true; // Restore bricks algorithm for turn blocks for SMBX19 and lower
-            else
-                block.forceSmashable = (bool)b.special_data; // load it if set in the modern format
+            // if(lvl.meta.RecentFormat == LevelData::SMBX64 && lvl.meta.RecentFormatVersion < 20)
+            //     block.forceSmashable = true; // Restore bricks algorithm for turn blocks for SMBX19 and lower
+            // else
+            block.forceSmashable = (bool)b.special_data; // load it if set in the modern format
         }
 
         block.Invis = b.invisible;
@@ -665,12 +640,7 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
         bgo.Location.Width = GFXBackgroundWidth[bgo.Type];
         bgo.Location.Height = BackgroundHeight[bgo.Type];
 
-        bgo.uid = int(b.meta.array_id);
-
-        bgo.zMode = b.z_mode;
-        bgo.zOffset = b.z_offset;
-
-        bgoApplyZMode(&bgo, int(b.smbx64_sp));
+        bgo.SetSortPriority(b.z_mode, std::round(b.z_offset));
     }
 
 
@@ -694,13 +664,14 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
         if(!LevelEditor)
             npc.Location.Y -= 0.01;
         npc.Direction = n.direct;
-        npc.Type = int(n.id);
 
-        if(IF_OUTRANGE(npc.Type, 0, maxNPCType)) // Drop ID to 1 for NPCs of out of range IDs
+        if(n.id > maxNPCType) // Drop ID to 1 for NPCs of out of range IDs
         {
-            pLogWarning("NPC-%d ID is out of range (max types %d), reset to NPC-1", npc.Type, maxNPCType);
-            npc.Type = 1;
+            pLogWarning("NPC-%d ID is out of range (max types %d), reset to NPC-1", (int)n.id, maxNPCType);
+            npc.Type = NPCID(1);
         }
+        else
+            npc.Type = NPCID(n.id);
 
         if(npc.Type == NPCID_ITEM_BURIED || npc.Type == NPCID_ITEM_POD ||
            npc.Type == NPCID_ITEM_BUBBLE || npc.Type == NPCID_ITEM_THROWER)
@@ -718,13 +689,13 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
             npc.DefaultSpecial2 = int(npc.Special2);
         }
 
-        if(NPCIsAParaTroopa[npc.Type])
+        if(NPCIsAParaTroopa(npc))
         {
             npc.Special = n.special_data;
             npc.DefaultSpecial = int(npc.Special);
         }
 
-        if(NPCIsCheep[npc.Type])
+        if(npc->IsFish)
         {
             npc.Special = n.special_data;
             npc.DefaultSpecial = int(npc.Special);
@@ -736,25 +707,27 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
             npc.DefaultSpecial = int(npc.Special);
         }
 
-        if(npc.Type == NPCID_STAR_EXIT || npc.Type == NPCID_STAR_COLLECT)
+        if(npc.Type == NPCID_STAR_EXIT || npc.Type == NPCID_STAR_COLLECT || npc.Type == NPCID_MEDAL)
         {
             npc.Variant = n.special_data;
             variantHandled = true;
         }
 
-        if(compatModern && isSmbx64)
+        // if(compatModern && isSmbx64)
+        // {
+        //     // legacy Smbx64 NPC behavior tracking moved to npc_special_data.h
+        //     npc.Variant = find_legacy_Variant(npc.Type, fVersion);
+        // }
+        // else
+
+        // don't load anything for SMBX64 files
+        if(isSmbx64)
         {
-            // legacy Smbx64 NPC behavior tracking moved to npc_special_data.h
-            npc.Variant = find_legacy_Variant(npc.Type, fVersion);
-        }
-        else if(isSmbx64)
-        {
-            // don't load anything for SMBX64 files
             npc.Variant = 0;
         }
+        // only load Variant for NPCs that support it
         else if(find_Variant_Data(npc.Type) /* && compatModern */)
         {
-            // only load Special7 for NPCs that support it
             if((n.special_data < 0) || (n.special_data >= 256))
                 pLogWarning("Attempted to load npc Type %d with out-of-range variant index %f", npc.Type, n.special_data);
             else
@@ -765,55 +738,6 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
             if(!variantHandled)
                 npc.Variant = 0;
         }
-
-        // All of the following duplicate the new Special7 code.
-        // That code should be updated instead, because doing so is required to update the in-game editor.
-
-#if 0
-        if(npc.Type == NPCID_CANNONITEM) // billy gun
-        {
-            if(compatModern && isSmbx64 && fVersion < 28)
-                npc.Special7 = 2.0; // SMBX 1.1.x and 1.0.x behavior
-            else if(compatModern && isSmbx64 && fVersion < 51)
-                npc.Special7 = 1.0; // SMBX 1.2 behavior
-            else if(compatModern)
-                npc.Special7 = n.special_data; // SMBX 1.2.1 and newer behavior, customizable behavior
-        }
-
-        if(npc.Type == NPCID_STONE_S3)
-        {
-            if(compatModern && isSmbx64 && fVersion < 9)
-                npc.Special7 = 1.0; // Make twomps to fall always
-            else if(compatModern)
-                npc.Special7 = n.special_data;
-        }
-
-        if(npc.Type == NPCID_VILLAIN_S3)
-        {
-            if(compatModern && isSmbx64 && fVersion < 30)
-                npc.Special7 = 1.0; // Keep original behavior of Bowser as in SMBX 1.0
-            else if(compatModern)
-                npc.Special7 = n.special_data;
-        }
-
-        switch(npc.Type)
-        {
-        case NPCID_YEL_PLATFORM:
-        case NPCID_BLU_PLATFORM:
-        case NPCID_GRN_PLATFORM:
-        case NPCID_RED_PLATFORM:
-        case NPCID_PLATFORM_S3:
-        case NPCID_SAW:
-            if(compatModern && isSmbx64 && fVersion < 30)
-                npc.Special7 = 1.0; // Workaround for yellow platform at The Invasion 1 on the "Clown Car Parking" level
-            else if(compatModern)
-                npc.Special7 = n.special_data;
-            break;
-
-        default:
-            break;
-        }
-#endif
 
         npc.Generator = n.generator;
         if(npc.Generator)
@@ -842,8 +766,8 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
         npc.AttLayer = FindLayer(n.attach_layer);
 
         npc.DefaultType = npc.Type;
-        npc.Location.Width = NPCWidth[npc.Type];
-        npc.Location.Height = NPCHeight[npc.Type];
+        npc.Location.Width = npc->TWidth;
+        npc.Location.Height = npc->THeight;
         npc.DefaultLocation = npc.Location;
         npc.DefaultDirection = npc.Direction;
 
@@ -1026,7 +950,7 @@ void OpenLevelDataPost()
         tr.loadLevelTranslation(FileNameFull);
 
     // FindBlocks();
-    qSortBackgrounds(1, numBackground);
+    qSortBackgrounds(1, numBackground, false);
     UpdateBackgrounds();
     // FindSBlocks();
     syncLayersTrees_AllBlocks();
@@ -1121,7 +1045,8 @@ void OpenLevelDataPost()
         }
     }
 
-    OrderMedals();
+    if(!LevelEditor)
+        OrderMedals();
 
     // If too much locks
     SDL_assert_release(numBackground + numLocked <= (maxBackgrounds + maxWarps));
@@ -1140,7 +1065,7 @@ void ClearLevel()
     const Background_t BlankBackground = Background_t();
     const Location_t BlankLocation = Location_t();
     const Effect_t blankEffect = Effect_t();
-    NPCScore[NPCID_MEDAL] = 6;
+    NPCTraits[NPCID_MEDAL].Score = 6;
     RestoreWorldStrings();
     LevelName.clear();
     ResetCompat();
@@ -1613,6 +1538,20 @@ bool CanConvertLevel(int format, std::string* reasons)
         }
     }
 
+    for(int i = 1; i <= numBackground; i++)
+    {
+        if(Background[i].GetCustomLayer() || Background[i].GetCustomOffset())
+        {
+            can_convert = false;
+            if(reasons)
+            {
+                *reasons += g_editorStrings.fileConvertFeatureBgoOrder;
+                *reasons += '\n';
+            }
+            break;
+        }
+    }
+
     return can_convert;
 }
 
@@ -1668,6 +1607,9 @@ void ConvertLevel(int format)
             ss.autoscroll = false;
         }
     }
+
+    for(int i = 1; i <= numBackground; i++)
+        Background[i].SetSortPriority(0, 0);
 
     for(int i = 1; i <= numNPCs; i++)
         NPC[i].Variant = 0;

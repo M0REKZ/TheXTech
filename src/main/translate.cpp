@@ -163,7 +163,7 @@ XTechTranslate::XTechTranslate()
     // List of all translatable strings of the engine
     m_engineMap =
     {
-        {"menu.main.mainStartGame",        &g_mainMenu.mainStartGame},
+        {"menu.main.mainPlayEpisode",        &g_mainMenu.mainPlayEpisode},
         {"menu.main.main1PlayerGame",      &g_mainMenu.main1PlayerGame},
         {"menu.main.mainMultiplayerGame",  &g_mainMenu.mainMultiplayerGame},
         {"menu.main.mainBattleGame",       &g_mainMenu.mainBattleGame},
@@ -431,18 +431,17 @@ XTechTranslate::XTechTranslate()
         {"game.pause.resetCheckpoints",     &g_gameStrings.pauseItemResetCheckpoints},
         {"game.pause.quitTesting",          &g_gameStrings.pauseItemQuitTesting},
         {"game.pause.returnToEditor",       &g_gameStrings.pauseItemReturnToEditor},
-        {"game.pause.dropAddPlayers",       &g_gameStrings.pauseItemDropAddPlayers},
+        {"game.pause.playerSetup",          &g_gameStrings.pauseItemPlayerSetup},
         {"game.pause.enterCode",            &g_gameStrings.pauseItemEnterCode},
         {"game.pause.saveAndContinue",      &g_gameStrings.pauseItemSaveAndContinue},
         {"game.pause.saveAndQuit",          &g_gameStrings.pauseItemSaveAndQuit},
         {"game.pause.quit",                 &g_gameStrings.pauseItemQuit},
 
         {"game.connect.reconnectTitle",            &g_gameStrings.connectReconnectTitle},
-        {"game.connect.dropAddTitle",              &g_gameStrings.connectDropAddTitle},
 
         {"game.connect.phrasePressAButton",        &g_gameStrings.connectPressAButton},
 
-        {"game.connect.phraseTestControls",        &g_gameStrings.connectTestControls},
+        {"game.connect.phraseTestProfile",        &g_gameStrings.connectTestProfile},
         {"game.connect.phraseHoldStart",           &g_gameStrings.connectHoldStart},
         {"game.connect.wordDisconnect",            &g_gameStrings.connectDisconnect},
 
@@ -543,6 +542,9 @@ XTechTranslate::XTechTranslate()
         {"editor.wordMode",                 &g_editorStrings.wordMode},
         {"editor.wordHeight",               &g_editorStrings.wordHeight},
         {"editor.wordWidth",                &g_editorStrings.wordWidth},
+
+        {"editor.labelSortLayer",           &g_editorStrings.labelSortLayer},
+        {"editor.labelSortOffset",          &g_editorStrings.labelSortOffset},
 
         {"editor.phraseTextOf",             &g_editorStrings.phraseTextOf},
         {"editor.phraseSectionIndex",       &g_editorStrings.phraseSectionIndex},
@@ -738,10 +740,12 @@ XTechTranslate::XTechTranslate()
 
         {"editor.file.convert.featureNPCVariant",       &g_editorStrings.fileConvertFeatureNPCVariant},
         {"editor.file.convert.featureBlockForceSmashable", &g_editorStrings.fileConvertFeatureBlockForceSmashable},
+        {"editor.file.convert.featureBgoOrder",         &g_editorStrings.fileConvertFeatureBgoOrder},
 
         {"editor.file.convert.featureCustomWorldMusic", &g_editorStrings.fileConvertFeatureCustomWorldMusic},
         {"editor.file.convert.featureWorldStarDisplay", &g_editorStrings.fileConvertFeatureWorldStarDisplay},
         {"editor.file.convert.featureLevelStarDisplay", &g_editorStrings.fileConvertFeatureLevelStarDisplay},
+        {"editor.file.convert.featureWorldMapSections", &g_editorStrings.fileConvertFeatureWorldMapSections},
 
         {"editor.browser.newFile",          &g_editorStrings.browserNewFile},
         {"editor.browser.saveFile",         &g_editorStrings.browserSaveFile},

@@ -146,13 +146,13 @@ int menuControls_Mouse_Render(bool mouse, bool render)
 
     // want 680px width. if not possible, use double-line mode on settable option screens
     int width = 680;
-    if(ScreenW < 720)
+    if(XRender::TargetW < 720)
     {
-        width = ScreenW - 40;
+        width = XRender::TargetW - 40;
     }
 
     // want up to 15 lines of text
-    int line = (ScreenH - 60) / 15;
+    int line = (XRender::TargetH - 60) / 15;
     line -= line & 1;
     if(line > 30)
         line = 30;
@@ -161,14 +161,14 @@ int menuControls_Mouse_Render(bool mouse, bool render)
     if(line < 18)
     {
         line = 18;
-        max_line = (int)ScreenH / line;
+        max_line = (int)XRender::TargetH / line;
     }
 
     // horizontal start of the menu
-    int sX = ScreenW/2 - width/2;
+    int sX = XRender::TargetW/2 - width/2;
     sX -= sX & 1;
     // vertical start of the menu
-    int sY = ScreenH/2 - (line*max_line)/2;
+    int sY = XRender::TargetH/2 - (line*max_line)/2;
     sY -= sY & 1;
 
     // render the background
@@ -272,7 +272,7 @@ int menuControls_Mouse_Render(bool mouse, bool render)
         if(top_line < 0)
             top_line = 0;
 
-        SuperPrintScreenCenter(g_gameStrings.connectTestControls, 3, sY+(top_line)*line);
+        SuperPrintScreenCenter(g_gameStrings.connectTestProfile, 3, sY+(top_line)*line);
 
         size_t p = s_changingProfilePlayer;
         if(!Controls::g_InputMethods[p])
@@ -286,7 +286,7 @@ int menuControls_Mouse_Render(bool mouse, bool render)
             SuperPrintScreenCenter(Controls::g_InputMethods[p]->Profile->Name, 3, sY+(top_line+3)*line);
 
         // display the test controls and profile reversion countdown (add more details)
-        RenderControls((int)p + 1, (ScreenW / 2) - 38, sY + (top_line + 4) * line, 76, 30, false, 1.0f);
+        RenderControls((int)p + 1, (XRender::TargetW / 2) - 38, sY + (top_line + 4) * line, 76, 30, false, 1.0f);
         SuperPrintScreenCenter(g_gameStrings.connectHoldStart, 3, sY + (top_line + 6) * line);
         int n_stars;
         int n_empty;
@@ -371,9 +371,9 @@ int menuControls_Mouse_Render(bool mouse, bool render)
                 }
 
                 if(in_use)
-                    SuperPrint(Controls::g_InputMethodTypes[scroll_start + i]->LocalName() + " " + g_mainMenu.controlsInUse, 3, sX+48, sY+(3+i)*line);
+                    SuperPrint(Controls::g_InputMethodTypes[scroll_start + i]->LocalName() + " " + g_mainMenu.controlsInUse, 5, sX+48, sY+(3+i)*line);
                 else
-                    SuperPrint(Controls::g_InputMethodTypes[scroll_start + i]->LocalName(), 3, sX+48, sY+(3+i)*line);
+                    SuperPrint(Controls::g_InputMethodTypes[scroll_start + i]->LocalName(), 5, sX+48, sY+(3+i)*line);
                 if(MenuCursor == scroll_start + i)
                     XRender::renderTexture(sX + 24, sY+(3+i)*line, GFX.MCursor[0]);
             }
@@ -407,13 +407,13 @@ int menuControls_Mouse_Render(bool mouse, bool render)
                     continue;
 
                 int cX = sX + 100 + (200 * (int)p);
-                SuperPrintCenter(Controls::g_InputMethods[p]->Name, 3, cX, sY+(max_line-4)*line);
+                SuperPrintCenter(Controls::g_InputMethods[p]->Name, 5, cX, sY+(max_line-4)*line);
 
                 // display the current profile
                 SuperPrintCenter(g_mainMenu.wordProfile + ":", 3, cX, sY+(max_line-3)*line);
                 // should never be null
                 if(Controls::g_InputMethods[p]->Profile != nullptr)
-                    SuperPrintCenter(Controls::g_InputMethods[p]->Profile->Name, 3, cX, sY+(max_line-2)*line);
+                    SuperPrintCenter(Controls::g_InputMethods[p]->Profile->Name, 5, cX, sY+(max_line-2)*line);
             }
         }
     }
@@ -538,11 +538,11 @@ int menuControls_Mouse_Render(bool mouse, bool render)
                     }
 
                     if(i == n_profiles)
-                        SuperPrint(g_mainMenu.controlsNewProfile, 3, sX+48, start_y + (i + 1-scroll_start)*line);
+                        SuperPrint(g_mainMenu.controlsNewProfile, 5, sX+48, start_y + (i + 1-scroll_start)*line);
                     else if(in_use)
-                        SuperPrint(profiles[i]->Name + " " + g_mainMenu.controlsInUse, 3, sX+48, start_y + (i + 1-scroll_start)*line);
+                        SuperPrint(profiles[i]->Name + " " + g_mainMenu.controlsInUse, 5, sX+48, start_y + (i + 1-scroll_start)*line);
                     else
-                        SuperPrint(profiles[i]->Name, 3, sX+48, start_y + (i + 1-scroll_start)*line);
+                        SuperPrint(profiles[i]->Name, 5, sX+48, start_y + (i + 1-scroll_start)*line);
                     if(MenuCursor == i)
                         XRender::renderTexture(sX + 24, start_y + (i + 1-scroll_start)*line, GFX.MCursor[0]);
                 }
@@ -602,7 +602,7 @@ int menuControls_Mouse_Render(bool mouse, bool render)
                     if(o_base + 2*i >= scroll_start && o_base + 2*i + 1 < scroll_end)
                     {
                         if(name)
-                            SuperPrint(name, 3, sX+24, start_y + (o_base + 2*i - scroll_start)*line);
+                            SuperPrint(name, 5, sX+24, start_y + (o_base + 2*i - scroll_start)*line);
                         if(value)
                             SuperPrint(value, 3, sX+48, start_y + (o_base + 2*i + 1 - scroll_start)*line);
                         if(MenuCursor - n_profiles - 1 == i)
@@ -640,7 +640,7 @@ int menuControls_Mouse_Render(bool mouse, bool render)
                     if(o_base + i >= scroll_start && o_base + i < scroll_end)
                     {
                         if(name)
-                            SuperPrint(name, 3, sX+48, start_y + (o_base + i - scroll_start)*line);
+                            SuperPrint(name, 5, sX+48, start_y + (o_base + i - scroll_start)*line);
                         if(value)
                             SuperPrintRightAlign(value, 3, sX+width-32, start_y + (o_base + i - scroll_start)*line);
                         if(MenuCursor - n_profiles - 1 == i)
@@ -814,7 +814,7 @@ int menuControls_Mouse_Render(bool mouse, bool render)
 
             if(render)
             {
-                SuperPrint(name, 3, sX+48, start_y+(i+s - scroll_start)*line);
+                SuperPrint(name, 5, sX+48, start_y+(i+s - scroll_start)*line);
                 if(MenuCursor == i)
                     XRender::renderTexture(sX + 24, start_y + (i+s - scroll_start)*line, GFX.MCursor[0]);
             }
@@ -858,7 +858,7 @@ int menuControls_Mouse_Render(bool mouse, bool render)
                 if(render)
                 {
                     if(o_base + 2*i >= scroll_start && o_base + 2*i < scroll_end && name)
-                        SuperPrint(name, 3, sX+24, start_y + (o_base + 2*i - scroll_start)*line);
+                        SuperPrint(name, 5, sX+24, start_y + (o_base + 2*i - scroll_start)*line);
                     if(o_base + 2*i + 1 >= scroll_start && o_base + 2*i + 1 < scroll_end)
                     {
                         if(value)
@@ -899,7 +899,7 @@ int menuControls_Mouse_Render(bool mouse, bool render)
                     if(o_base + i >= scroll_start && o_base + i < scroll_end)
                     {
                         if(name)
-                            SuperPrint(name, 3, sX+48, start_y + (o_base + i - scroll_start)*line);
+                            SuperPrint(name, 5, sX+48, start_y + (o_base + i - scroll_start)*line);
                         if(value)
                             SuperPrintRightAlign(value, 3, sX+width-32, start_y + (o_base + i - scroll_start)*line);
                         if(MenuCursor - n_stock == i)
@@ -1090,7 +1090,7 @@ int menuControls_Mouse_Render(bool mouse, bool render)
                 else if(s_profileTab == Controls::ControlsClass::Hotkey)
                     name = Controls::Hotkeys::GetButtonName_UI(i);
 
-                SuperPrint(name, 3, label_x, start_y + label_row * line);
+                SuperPrint(name, 5, label_x, start_y + label_row * line);
 
                 if(MenuCursor == i && !s_secondaryInput && g_pollingInput)
                     SuperPrint("...", 3, left_value_x, start_y + value_row * line);

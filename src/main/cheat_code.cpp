@@ -45,6 +45,7 @@
 #include "game_main.h"
 #include "change_res.h"
 #include "config.h"
+#include "compat.h"
 #include "frm_main.h"
 
 #include "core/render.h"
@@ -60,6 +61,7 @@
 #include "main/cheat_code.h"
 
 #include "npc_id.h"
+#include "npc_traits.h"
 #include "eff_id.h"
 
 bool g_ForceBitmaskMerge = false;
@@ -79,6 +81,7 @@ static void dieCheater()
     PlaySound(SFX_SMExplosion);
     Score = 0; // Being very evil here, mu-ha-ha-ha-ha! >:D
     Lives = 0;
+    g_100s = 0;
     Coins = 0;
     GodMode = false;
     ClearGame(true); // As a penalty, remove the saved game
@@ -219,7 +222,7 @@ static void needAShell()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 113;
+        Player[B].HeldBonus = NPCID_GRN_SHELL_S4;
 }
 
 static void fairyMagic()
@@ -260,7 +263,7 @@ static void iceAge()
     {
         if(NPC[C].Active)
         {
-            if(!NPCNoIceBall[NPC[C].Type] && NPC[C].Type != NPCID_ICE_CUBE && !NPCIsABonus[NPC[C].Type])
+            if(!NPC[C]->NoIceBall && NPC[C].Type != NPCID_ICE_CUBE && !NPC[C]->IsABonus)
             {
                 NPC[0].Type = NPCID_PLR_ICEBALL;
                 NPCHit(C, 3, 0);
@@ -420,35 +423,35 @@ static void needARedShell()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 114;
+        Player[B].HeldBonus = NPCID_RED_SHELL_S4;
 }
 
 static void needABlueShell()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 115;
+        Player[B].HeldBonus = NPCID_BLU_SHELL_S4;
 }
 
 static void needAYellowShell()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 116;
+        Player[B].HeldBonus = NPCID_YEL_SHELL_S4;
 }
 
 static void needATurnip()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 92;
+        Player[B].HeldBonus = NPCID_VEGGIE_1;
 }
 
 static void needA1Up()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 90;
+        Player[B].HeldBonus = NPCID_LIFE_S3;
 }
 
 static void needATanookiSuit()
@@ -456,7 +459,7 @@ static void needATanookiSuit()
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
     {
-        Player[B].HeldBonus = 169;
+        Player[B].HeldBonus = NPCID_STATUE_POWER;
 
         if(Player[B].Character >= 3 && Player[B].State != 5)
         {
@@ -482,7 +485,7 @@ static void needAHammerSuit()
 
     for(int B = 1; B <= numPlayers; B++)
     {
-        Player[B].HeldBonus = 170;
+        Player[B].HeldBonus = NPCID_HEAVY_POWER;
 
         if(Player[B].Character >= 3 && Player[B].State != 6)
         {
@@ -508,7 +511,7 @@ static void needAMushroom()
 
     for(int B = 1; B <= numPlayers; B++)
     {
-        Player[B].HeldBonus = 9;
+        Player[B].HeldBonus = NPCID_POWER_S3;
 
         if(Player[B].Character >= 3 && Player[B].State == 1)
         {
@@ -534,7 +537,7 @@ static void needAFlower()
 
     for(int B = 1; B <= numPlayers; B++)
     {
-        Player[B].HeldBonus = 14;
+        Player[B].HeldBonus = NPCID_FIRE_POWER_S3;
 
         if(Player[B].Character >= 3 && Player[B].State != 3)
         {
@@ -560,7 +563,7 @@ static void needAnIceFlower()
 
     for(int B = 1; B <= numPlayers; B++)
     {
-        Player[B].HeldBonus = 264;
+        Player[B].HeldBonus = NPCID_ICE_POWER_S3;
 
         if(Player[B].Character >= 3 && Player[B].State != 7)
         {
@@ -585,7 +588,7 @@ static void needALeaf()
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
     {
-        Player[B].HeldBonus = 34;
+        Player[B].HeldBonus = NPCID_LEAF_POWER;
 
         if(Player[B].Character >= 3 && Player[B].State != 4)
         {
@@ -609,63 +612,63 @@ static void needANegg()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 96;
+        Player[B].HeldBonus = NPCID_ITEM_POD;
 }
 
 static void needAPlant()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 49;
+        Player[B].HeldBonus = NPCID_TOOTHYPIPE;
 }
 
 static void needAGun()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 22;
+        Player[B].HeldBonus = NPCID_CANNONITEM;
 }
 
 static void needASwitch()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 32;
+        Player[B].HeldBonus = NPCID_COIN_SWITCH;
 }
 
 static void needAClock()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 248;
+        Player[B].HeldBonus = NPCID_TIMER_S3;
 }
 
 static void needABomb()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 135;
+        Player[B].HeldBonus = NPCID_WALK_BOMB_S2;
 }
 
 static void needAShoe()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 35;
+        Player[B].HeldBonus = NPCID_GRN_BOOT;
 }
 
 static void redShoe()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 191;
+        Player[B].HeldBonus = NPCID_RED_BOOT;
 }
 
 static void blueShoe()
 {
     PlaySound(SFX_GotItem);
     for(int B = 1; B <= numPlayers; B++)
-        Player[B].HeldBonus = 193;
+        Player[B].HeldBonus = NPCID_BLU_BOOT;
 }
 
 static void shadowStar()
@@ -1246,8 +1249,13 @@ static void fourShared()
 static void fourSplit()
 {
     fourShared();
-    Screens[0].multiplayer_pref = MultiplayerPrefs::Split;
-    SetupScreens();
+
+    // more than 2 vScreens requires modern camera logic
+    if(g_compatibility.modern_npc_camera_logic)
+    {
+        Screens[0].multiplayer_pref = MultiplayerPrefs::Split;
+        SetupScreens();
+    }
 }
 
 static void warioTime()
@@ -1258,11 +1266,11 @@ static void warioTime()
     {
         if(NPC[B].Active)
         {
-            if(!NPCWontHurt[NPC[B].Type] &&
-               !NPCIsABlock[NPC[B].Type] &&
-               !NPCIsABonus[NPC[B].Type] &&
-               !NPCIsACoin[NPC[B].Type] &&
-               !NPCIsAnExit[NPC[B].Type] &&
+            if(!NPC[B]->WontHurt &&
+               !NPC[B]->IsABlock &&
+               !NPC[B]->IsABonus &&
+               !NPC[B]->IsACoin &&
+               !NPCIsAnExit(NPC[B]) &&
                 NPC[B].Type != NPCID_ITEM_BURIED && !NPC[B].Generator &&
                !NPC[B].Inert
             )
@@ -1275,8 +1283,8 @@ static void warioTime()
                 tempLocation.X -= 16;
                 NewEffect(EFFID_SMOKE_S3, tempLocation);
                 NPC[B].Type = NPCID_COIN_S3;
-                NPC[B].Location.Width = NPCWidth[NPC[B].Type];
-                NPC[B].Location.Height = NPCHeight[NPC[B].Type];
+                NPC[B].Location.Width = NPC[B]->TWidth;
+                NPC[B].Location.Height = NPC[B]->THeight;
                 NPC[B].Location.Y += -NPC[B].Location.Height / 2.0;
                 NPC[B].Location.X += -NPC[B].Location.Width / 2.0;
                 NPC[B].Location.SpeedX = 0;
@@ -1298,8 +1306,8 @@ static void carKeys()
             numNPCs++;
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_KEY;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
             NPC[numNPCs].Active = true;
@@ -1325,8 +1333,8 @@ static void boingyBoing()
             numNPCs++;
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_SPRING;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
             NPC[numNPCs].Active = true;
@@ -1351,8 +1359,8 @@ static void bombsAway()
             numNPCs++;
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_BOMB;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.X = Player[B].Location.X;
             NPC[numNPCs].Location.Y = Player[B].Location.Y;
             NPC[numNPCs].Location.SpeedX = 0;
@@ -1380,8 +1388,8 @@ static void fireMissiles()
             numNPCs++;
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_BULLET;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
             NPC[numNPCs].Active = true;
@@ -1406,8 +1414,8 @@ static void hellFire()
             numNPCs++;
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_FLY_CANNON;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
             NPC[numNPCs].Active = true;
@@ -1434,8 +1442,8 @@ static void upAndOut()
             numNPCs++;
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_FLY_BLOCK;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
             NPC[numNPCs].Active = true;
@@ -1462,8 +1470,8 @@ static void powHammer()
             numNPCs++;
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_EARTHQUAKE_BLOCK;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
             NPC[numNPCs].Active = true;
@@ -1491,8 +1499,8 @@ static void hammerInMyPants()
             numNPCs++;
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_HEAVY_THROWER;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
             NPC[numNPCs].Active = true;
@@ -1520,11 +1528,11 @@ static void rainbowRider()
             numNPCs++;
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_FLIPPED_RAINBOW_SHELL;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
-            NPC[numNPCs].Effect = 2;
+            NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
             NPC[numNPCs].Active = true;
             NPC[numNPCs].TimeLeft = 200;
             NPC[numNPCs].HoldingPlayer = B;
@@ -1547,11 +1555,11 @@ static void greenEgg()
             NPC[numNPCs] = NPC_t();
             NPC[numNPCs].Type = NPCID_ITEM_POD;
             NPC[numNPCs].Special = 95;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
-            NPC[numNPCs].Effect = 2;
+            NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
             NPC[numNPCs].Active = true;
             NPC[numNPCs].TimeLeft = 200;
             NPC[numNPCs].HoldingPlayer = B;
@@ -1575,11 +1583,11 @@ static void blueEgg()
             NPC[numNPCs].Type = NPCID_ITEM_POD;
             NPC[numNPCs].Frame = 1;
             NPC[numNPCs].Special = 98;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
-            NPC[numNPCs].Effect = 2;
+            NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
             NPC[numNPCs].Active = true;
             NPC[numNPCs].TimeLeft = 200;
             NPC[numNPCs].HoldingPlayer = B;
@@ -1603,11 +1611,11 @@ static void yellowEgg()
             NPC[numNPCs].Type = NPCID_ITEM_POD;
             NPC[numNPCs].Special = 99;
             NPC[numNPCs].Frame = 2;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
-            NPC[numNPCs].Effect = 2;
+            NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
             NPC[numNPCs].Active = true;
             NPC[numNPCs].TimeLeft = 200;
             NPC[numNPCs].HoldingPlayer = B;
@@ -1631,11 +1639,11 @@ static void redEgg()
             NPC[numNPCs].Type = NPCID_ITEM_POD;
             NPC[numNPCs].Special = 100;
             NPC[numNPCs].Frame = 3;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
-            NPC[numNPCs].Effect = 2;
+            NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
             NPC[numNPCs].Active = true;
             NPC[numNPCs].TimeLeft = 200;
             NPC[numNPCs].HoldingPlayer = B;
@@ -1660,11 +1668,11 @@ static void blackEgg()
             NPC[numNPCs].Type = NPCID_ITEM_POD;
             NPC[numNPCs].Special = 148;
             NPC[numNPCs].Frame = 4;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
-            NPC[numNPCs].Effect = 2;
+            NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
             NPC[numNPCs].Active = true;
             NPC[numNPCs].TimeLeft = 200;
             NPC[numNPCs].HoldingPlayer = B;
@@ -1688,11 +1696,11 @@ static void purpleEgg()
             NPC[numNPCs].Type = NPCID_ITEM_POD;
             NPC[numNPCs].Special = 149;
             NPC[numNPCs].Frame = 5;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
-            NPC[numNPCs].Effect = 2;
+            NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
             NPC[numNPCs].Active = true;
             NPC[numNPCs].TimeLeft = 200;
             NPC[numNPCs].HoldingPlayer = B;
@@ -1716,11 +1724,11 @@ static void pinkEgg()
             NPC[numNPCs].Type = NPCID_ITEM_POD;
             NPC[numNPCs].Special = 150;
             NPC[numNPCs].Frame = 6;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
-            NPC[numNPCs].Effect = 2;
+            NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
             NPC[numNPCs].Active = true;
             NPC[numNPCs].TimeLeft = 200;
             NPC[numNPCs].HoldingPlayer = B;
@@ -1744,11 +1752,11 @@ static void coldEgg()
             NPC[numNPCs].Type = NPCID_ITEM_POD;
             NPC[numNPCs].Special = 228;
             NPC[numNPCs].Frame = 6;
-            NPC[numNPCs].Location.Width = NPCWidth[NPC[numNPCs].Type];
-            NPC[numNPCs].Location.Height = NPCHeight[NPC[numNPCs].Type];
+            NPC[numNPCs].Location.Width = NPC[numNPCs]->TWidth;
+            NPC[numNPCs].Location.Height = NPC[numNPCs]->THeight;
             NPC[numNPCs].Location.SpeedX = 0;
             NPC[numNPCs].Location.SpeedY = 0;
-            NPC[numNPCs].Effect = 2;
+            NPC[numNPCs].Effect = NPCEFF_DROP_ITEM;
             NPC[numNPCs].Active = true;
             NPC[numNPCs].TimeLeft = 200;
             NPC[numNPCs].HoldingPlayer = B;

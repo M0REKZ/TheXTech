@@ -22,6 +22,7 @@
 
 #include "core/events.h"
 #include "globals.h"
+#include "npc_traits.h"
 #include <fmt_format_ne.h>
 #include <cmath>
 #include <cfenv>
@@ -83,6 +84,7 @@ double PrintFPS = 0.0;
 // int DScreenType = 0;
 bool LevelEditor = false;
 bool WorldEditor = false;
+bool g_forceCharacter = false;
 RangeArr<PlayerStart_t, 1, 2> PlayerStart;
 RangeArrI<bool, 0, 20, false> blockCharacter;
 RangeArrI<int, 0, maxPlayers, 0> OwedMount;
@@ -162,6 +164,10 @@ RangeArrI<int, 0, maxPlayerFrames, 0> ToadFrameY;
 RangeArrI<int, 0, maxPlayerFrames, 0> LinkFrameX;
 RangeArrI<int, 0, maxPlayerFrames, 0> LinkFrameY;
 RangeArrI<bool, 0, maxBackgroundType, false> BackgroundFence;
+
+RangeArr<NPCTraits_t, 0, maxNPCType> NPCTraits;
+
+#if 0
 RangeArrI<int, 0, maxNPCType, 0> NPCFrameOffsetX;
 RangeArrI<int, 0, maxNPCType, 0> NPCFrameOffsetY;
 RangeArrI<int, 0, maxNPCType, 0> NPCWidth;
@@ -170,15 +176,15 @@ RangeArrI<int, 0, maxNPCType, 0> NPCWidthGFX;
 RangeArrI<int, 0, maxNPCType, 0> NPCHeightGFX;
 RangeArr<float, 0, maxNPCType> NPCSpeedvar;
 
-RangeArrI<bool, 0, maxNPCType, false> NPCIsAShell;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsAShell;
 RangeArrI<bool, 0, maxNPCType, false> NPCIsABlock;
 RangeArrI<bool, 0, maxNPCType, false> NPCIsAHit1Block;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsABonus;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsACoin;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsAVine;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsAnExit;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsAParaTroopa;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsCheep;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsABonus;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsACoin;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsAVine;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsAnExit;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsAParaTroopa;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsCheep;
 RangeArrI<bool, 0, maxNPCType, false> NPCJumpHurt;
 RangeArrI<bool, 0, maxNPCType, false> NPCNoClipping;
 RangeArrI<int, 0, maxNPCType, 0> NPCScore;
@@ -189,14 +195,14 @@ RangeArrI<bool, 0, maxNPCType, false> NPCWontHurt;
 RangeArrI<bool, 0, maxNPCType, false> NPCMovesPlayer;
 RangeArrI<bool, 0, maxNPCType, false> NPCStandsOnPlayer;
 RangeArrI<bool, 0, maxNPCType, false> NPCIsGrabbable;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsBoot;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsYoshi;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsToad;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsBoot;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsYoshi;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsToad;
 RangeArrI<bool, 0, maxNPCType, false> NPCNoYoshi;
 RangeArrI<bool, 0, maxNPCType, false> NPCForeground;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsABot;
-RangeArrI<bool, 0, maxNPCType, false> NPCDefaultMovement;
-RangeArrI<bool, 0, maxNPCType, false> NPCIsVeggie;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsABot;
+// RangeArrI<bool, 0, maxNPCType, false> NPCDefaultMovement;
+// RangeArrI<bool, 0, maxNPCType, false> NPCIsVeggie;
 RangeArrI<bool, 0, maxNPCType, false> NPCNoFireBall;
 RangeArrI<bool, 0, maxNPCType, false> NPCNoIceBall;
 RangeArrI<bool, 0, maxNPCType, false> NPCNoGravity;
@@ -204,6 +210,7 @@ RangeArrI<bool, 0, maxNPCType, false> NPCNoGravity;
 RangeArrI<int, 0, maxNPCType, 0> NPCFrame;
 RangeArrI<int, 0, maxNPCType, 0> NPCFrameSpeed;
 RangeArrI<int, 0, maxNPCType, 0> NPCFrameStyle;
+#endif
 
 RangeArrI<bool, 0, maxBlockType, false> BlockIsSizable;
 RangeArrI<int, 0, maxBlockType, 0> BlockSlope;
@@ -297,6 +304,7 @@ int FileFormatWorld = 0;
 bool IsEpisodeIntro = false;
 int Coins = 0;
 float Lives = 0.0f;
+int g_100s = 0;
 bool EndIntro = false;
 bool ExitMenu = false;
 bool LevelSelect = false;
@@ -397,8 +405,8 @@ RangeArrI<bool, 1, maxNPCType, false> GFXNPCCustom;
 //RangeArrI<long, 1, maxNPCType, 0> GFXNPCMask;
 RangeArr<StdPicture, 0, maxNPCType> GFXNPCBMP;
 //RangeArr<StdPicture, 0, maxNPCType> GFXNPCMaskBMP;
-RangeArrI<int, 1, maxNPCType, 0> GFXNPCHeight;
-RangeArrI<int, 1, maxNPCType, 0> GFXNPCWidth;
+// RangeArrI<int, 1, maxNPCType, 0> GFXNPCHeight;
+// RangeArrI<int, 1, maxNPCType, 0> GFXNPCWidth;
 RangeArrI<bool, 1, maxEffectType, false> GFXEffectCustom;
 //RangeArrI<long, 1, maxEffectType, 0> GFXEffect;
 //RangeArrI<long, 1, maxEffectType, 0> GFXEffectMask;
@@ -599,7 +607,7 @@ void initAll()
     Background2REAL.fill(0);
     Background2.fill(0);
     SpecialFrameCount.fill(0.f);
-    NPCSpeedvar.fill(0.f);
+    // NPCSpeedvar.fill(0.f);
 
     Block.fill(Block_t());
     Background.fill(Background_t());

@@ -66,7 +66,7 @@ void CheckSection(const int A);
 void PlayerFrame(const int A);
 void PlayerFrame(struct Player_t &p);
 // Public Sub UpdatePlayerBonus(A As Integer, B As Integer)
-void UpdatePlayerBonus(const int A, const int B);
+void UpdatePlayerBonus(const int A, const NPCID B);
 // Public Sub TailSwipe(plr As Integer, Optional bool As Boolean = False, Optional Stab As Boolean = False, Optional StabDir As Integer = 0)  'for whacking something with the tail
 // for whacking something with the tail
 void TailSwipe(const int plr, bool boo = false, bool Stab = false, int StabDir = 0);
@@ -127,7 +127,7 @@ void DropPlayer(const int A);
 void AddPlayer(int Character);
 
 // NEW but, when Die is false and FromBlock is true, identical to hitting character block.
-void SwapCharacter(int A, int Character, bool Die = false, bool FromBlock = false);
+void SwapCharacter(int A, int Character, bool FromBlock = false);
 
 // returns whether a player is allowed to swap characters
 bool SwapCharAllowed();

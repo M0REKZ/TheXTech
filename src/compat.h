@@ -95,11 +95,14 @@ struct Compatibility_t
     unsigned int bitblit_background_colour[3];
     // 1.3.6.3
     bool pound_by_alt_run; // use alt run for pound action when player is in a purple pet mount
+    // 1.3.6.5
+    bool fix_visual_bugs; // fix misc visual bugs from SMBX 1.3
     // 1.3.7
     bool modern_npc_camera_logic; // NPCs should support more than two cameras, and consider the event logic camera when activating
     bool allow_multires;
     bool disable_background2_tiling;
     bool world_map_lvlname_marquee;
+    bool modern_lives_system;
 
     // SpeedRun section
     enum

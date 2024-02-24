@@ -34,6 +34,8 @@
 #include "ref_type.h"
 #include "rand.h"
 #include "floats.h"
+#include "npc_id.h"
+#include "npc_effect.h"
 
 #include "global_constants.h"
 #include "global_strings.h"
@@ -245,12 +247,14 @@ struct OldEditorControls_t
 // extern RangeArrI<int, 1, maxLocalPlayers, 0> useJoystick; // no longer
 // extern RangeArrI<bool, 1, maxLocalPlayers, false> wantedKeyboard;
 
+struct NPCTraits_t;
+
 //Public Type NPC 'The NPC Type
 struct NPC_t
 {
     // most important and frequently accessed fields at the top of the struct
 //    Type As Integer 'Defines what NPC this is.  1 for goomba, 2 for red goomba, etc.
-    vbint_t Type = 0;
+    NPCID Type = NPCID(0);
 //    Killed As Integer 'Flags the NPC to die a specific way.
     vbint_t Killed = 0;
 //    Frame As Integer 'The graphic to be shown
@@ -306,7 +310,7 @@ struct NPC_t
 //    Effect2 As Double
     double Effect2 = 0.0; // When Effect 4, Used to store a destination position, must be in double!
 //    Effect As Integer 'For starting / stopping effects
-    vbint_t Effect = 0;
+    NPCEffect Effect = NPCEFF_NORMAL;
 //    Effect3 As Integer
     vbint_t Effect3 = 0;
 
@@ -439,7 +443,7 @@ struct NPC_t
 
 //'the default values are used when De-Activating an NPC when it goes on screen
 //    DefaultType As Integer
-    vbint_t DefaultType = 0;
+    NPCID DefaultType = NPCID(0);
 //    DefaultLocation As Location
     Location_t DefaultLocation;
 //    DefaultDirection As Single
@@ -462,6 +466,8 @@ struct NPC_t
     // int Settings = 0;    // unused since SMBX64, removed
 
 //End Type
+
+    const NPCTraits_t* operator->() const;
 
     NPC_t() : TurnAround(false), onWall(false), TurnBackWipe(false), GeneratorActive(false),
         playerTemp(false), Legacy(false), Chat(false), NoLavaSplash(false),
@@ -543,7 +549,7 @@ struct Player_t
 //    ShellSurf As Boolean 'true if surfing a shell
     bool ShellSurf = false;
 //    StateNPC As Integer
-    int StateNPC = 0;
+    NPCID StateNPC = NPCID(0);
 //    Slope As Integer 'the block that the player is standing on when on a slope
     int Slope = 0;
 //    Stoned As Boolean 'true of a statue form (tanooki suit)
@@ -701,7 +707,7 @@ struct Player_t
 //    CanGrabNPCs As Boolean 'If the player can grab NPCs
     bool CanGrabNPCs = false;
 //    HeldBonus As Integer 'the NPC that is in the player's container
-    int HeldBonus = 0;
+    NPCID HeldBonus = NPCID(0);
 //    Section As Integer 'What section of the level the player is in
     int Section = 0;
 //    WarpCD As Integer 'delay before allowing the player to warp again
@@ -748,22 +754,33 @@ struct Player_t
 //Public Type Background  'Background objects
 struct Background_t
 {
-//    Layer As String
-    layerindex_t Layer = LAYER_NONE;
-//    Hidden As Boolean
-    bool Hidden = false;
 //    Type As Integer
     vbint_t Type = 0;
+//    Hidden As Boolean
+    bool Hidden = false;
+//    Layer As String
+    layerindex_t Layer = LAYER_NONE;
+//    EXTRA: sort priority for BGO (NOT a draw plane itself, a BGO-only format used for sorting and determining draw plane)
+    uint8_t SortPriority = 0;
 //    Location As Location
     Location_t Location;
-//EXTRA: make a custom sorting priority
-    int SortPriority = -1;
-//EXTRA: Preserved Z-Mode value
-    int zMode = 0;
-//EXTRA: sub-priority
-    double zOffset = 0.0;
-//EXTRA: UID
-    int uid = 0;
+
+    //! SortPriority at which PLANE_LVL_BGO_NORM, PLANE_LVL_BGO_FG, and PLANE_LVL_BGO_TOP start
+    static constexpr uint8_t PRI_NORM_START = 0x30;
+    static constexpr uint8_t PRI_FG_START = 0xA0;
+    static constexpr uint8_t PRI_TOP_START = 0xC0;
+
+    // all defined in sorting.cpp:
+
+    //! checks if a custom sorting layer is set; returns -2, -1, +1, or +2 if so, 0 if not
+    int GetCustomLayer() const;
+    //! returns custom sorting offset (a number between -3 and +3)
+    int GetCustomOffset() const;
+    //! sets custom sorting layer and offset bits and updates sort priority
+    void SetSortPriority(int layer, int offset);
+    //! updates SortPriority based on current type, custom layer, and custom offset
+    void UpdateSortPriority();
+
 //End Type
 };
 
@@ -827,11 +844,11 @@ struct Block_t
 //    Invis As Boolean 'for invisible blocks
     bool Invis = false;
 //    NPC As Integer 'when a coin is turned into a block after the p switch is hit
-    vbint_t NPC = 0;
+    NPCID NPC = NPCID(0);
 //    IsPlayer As Integer 'for the clown car
     vbint_t IsPlayer = 0;
 //    IsNPC As Integer 'the type of NPC the block is
-    vbint_t IsNPC = 0;
+    NPCID IsNPC = NPCID(0);
 //    standingOnPlayerY As Integer 'when standing on a player in the clown car
     vbint_t standingOnPlayerY = 0;
 //    noProjClipping As Boolean
@@ -887,7 +904,7 @@ struct Effect_t
     vbint_t FrameCount = 0;
 //    Life As Integer 'timer before the effect disappears
     vbint_t Life = 0;
-//    NewNpc As Integer 'when an effect should create and NPC, such as Yoshi
+//    NewNpc As Integer 'when an effect should create and NPC, such as Yoshi (NOTE: occasionally abused, so not turning into an NPCID)
     vbint_t NewNpc = 0;
 // EXTRA: New NPC's special value
     uint8_t NewNpcSpecial = 0;
@@ -973,6 +990,10 @@ struct WorldLevel_t
     // NEW: returns graphical location extent (based on whether GFXLevelBig is set)
     //   defined in graphics.cpp
     Location_t LocationGFX();
+
+    // NEW: returns location extent, including big background paths, for onscreen checks
+    //   defined in graphics.cpp
+    Location_t LocationOnscreen();
 };
 
 //Public Type Warp 'warps such as pipes and doors
@@ -1280,6 +1301,9 @@ extern bool WorldEditor;
 //Public PlayerStart(1 To 2) As Location
 extern RangeArr<PlayerStart_t, 1, 2> PlayerStart;
 
+// NEW: force selected characters to be used (ignore the blockCharacter array)
+extern bool g_forceCharacter;
+
 //Public blockCharacter(0 To 20) As Boolean
 extern RangeArrI<bool, 0, 20, false> blockCharacter;
 
@@ -1491,6 +1515,10 @@ extern RangeArrI<int, 0, maxPlayerFrames, 0> LinkFrameX;
 extern RangeArrI<int, 0, maxPlayerFrames, 0> LinkFrameY;
 //Public BackgroundFence(0 To maxBackgroundType) As Boolean
 extern RangeArrI<bool, 0, maxBackgroundType, false> BackgroundFence;
+
+#if 0
+// moved to npc_traits.h
+
 //Public NPCFrameOffsetX(0 To maxNPCType) As Integer 'NPC frame offset X
 extern RangeArrI<int, 0, maxNPCType, 0> NPCFrameOffsetX;
 //Public NPCFrameOffsetY(0 To maxNPCType) As Integer 'NPC frame offset Y
@@ -1507,23 +1535,23 @@ extern RangeArrI<int, 0, maxNPCType, 0> NPCHeightGFX;
 extern RangeArr<float, 0, maxNPCType> NPCSpeedvar;
 
 //Public NPCIsAShell(0 To maxNPCType) As Boolean 'Flags the NPC type if it is a shell
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsAShell;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsAShell;
 //Public NPCIsABlock(0 To maxNPCType) As Boolean 'Flag NPC as a block
 extern RangeArrI<bool, 0, maxNPCType, false> NPCIsABlock;
 //Public NPCIsAHit1Block(0 To maxNPCType) As Boolean 'Flag NPC as a hit1 block
 extern RangeArrI<bool, 0, maxNPCType, false> NPCIsAHit1Block;
 //Public NPCIsABonus(0 To maxNPCType) As Boolean 'Flags the NPC type if it is a bonus
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsABonus;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsABonus;
 //Public NPCIsACoin(0 To maxNPCType) As Boolean 'Flags the NPC type if it is a coin
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsACoin;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsACoin;
 //Public NPCIsAVine(0 To maxNPCType) As Boolean 'Flags the NPC type if it is a vine
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsAVine;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsAVine;
 //Public NPCIsAnExit(0 To maxNPCType) As Boolean 'Flags the NPC type if it is a level exit
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsAnExit;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsAnExit;
 //Public NPCIsAParaTroopa(0 To maxNPCType) As Boolean 'Flags the NPC type as a para-troopa
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsAParaTroopa;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsAParaTroopa;
 //Public NPCIsCheep(0 To maxNPCType) As Boolean 'Flags the NPC type as a cheep cheep
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsCheep;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsCheep;
 //Public NPCJumpHurt(0 To maxNPCType) As Boolean 'Hurts the player even if it jumps on the NPC
 extern RangeArrI<bool, 0, maxNPCType, false> NPCJumpHurt;
 //Public NPCNoClipping(0 To maxNPCType) As Boolean 'NPC can go through blocks
@@ -1545,21 +1573,21 @@ extern RangeArrI<bool, 0, maxNPCType, false> NPCStandsOnPlayer;
 //Public NPCIsGrabbable(0 To maxNPCType) As Boolean 'Player can grab the NPC
 extern RangeArrI<bool, 0, maxNPCType, false> NPCIsGrabbable;
 //Public NPCIsBoot(0 To maxNPCType) As Boolean 'npc is a kurbo's shoe
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsBoot;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsBoot;
 //Public NPCIsYoshi(0 To maxNPCType) As Boolean 'npc is a yoshi
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsYoshi;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsYoshi;
 //Public NPCIsToad(0 To maxNPCType) As Boolean 'npc is a toad
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsToad;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsToad;
 //Public NPCNoYoshi(0 To maxNPCType) As Boolean 'Player can't eat the NPC
 extern RangeArrI<bool, 0, maxNPCType, false> NPCNoYoshi;
 //Public NPCForeground(0 To maxNPCType) As Boolean 'draw the npc in front
 extern RangeArrI<bool, 0, maxNPCType, false> NPCForeground;
 //Public NPCIsABot(0 To maxNPCType) As Boolean 'Zelda 2 Bot monster
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsABot;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsABot;
 //Public NPCDefaultMovement(0 To maxNPCType) As Boolean 'default NPC movement
-extern RangeArrI<bool, 0, maxNPCType, false> NPCDefaultMovement;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCDefaultMovement;
 //Public NPCIsVeggie(0 To maxNPCType) As Boolean 'turnips
-extern RangeArrI<bool, 0, maxNPCType, false> NPCIsVeggie;
+// extern RangeArrI<bool, 0, maxNPCType, false> NPCIsVeggie;
 //Public NPCNoFireBall(0 To maxNPCType) As Boolean 'not hurt by fireball
 extern RangeArrI<bool, 0, maxNPCType, false> NPCNoFireBall;
 //Public NPCNoIceBall(0 To maxNPCType) As Boolean 'not hurt by fireball
@@ -1573,6 +1601,7 @@ extern RangeArrI<int, 0, maxNPCType, 0> NPCFrame;
 extern RangeArrI<int, 0, maxNPCType, 0> NPCFrameSpeed;
 //Public NPCFrameStyle(0 To maxNPCType) As Integer
 extern RangeArrI<int, 0, maxNPCType, 0> NPCFrameStyle;
+#endif
 
 //Public Type NPCDefaults 'Default NPC Settings
 // Moved into custom.cpp as local-private
@@ -1784,6 +1813,8 @@ extern bool IsEpisodeIntro;
 extern int Coins;
 //Public Lives As Single 'number of lives
 extern float Lives;
+//NEW: tracker of number of hundreds of coins that have been obtained
+extern int g_100s;
 //Public EndIntro As Boolean
 extern bool EndIntro;
 //Public ExitMenu As Boolean
@@ -1845,7 +1876,7 @@ extern int PSwitchPlayer;
 
 struct SavedChar_t
 {
-    uint16_t HeldBonus = 0;
+    uint16_t HeldBonus = NPCID(0);
     uint8_t State = 1;
     uint8_t Mount = 0;
     uint8_t MountType = 0;
@@ -1868,7 +1899,7 @@ struct SavedChar_t
     {
         Player_t p;
 
-        p.HeldBonus = HeldBonus;
+        p.HeldBonus = NPCID(HeldBonus);
         p.State = State;
         p.Mount = Mount;
         p.MountType = MountType;
@@ -1892,6 +1923,7 @@ struct SaveSlotInfo_t
     int Progress = -1;
     int Stars = 0;
     int Lives = 3;
+    int Hundreds = 0;
     int Coins = 0;
 };
 
@@ -2128,10 +2160,13 @@ extern RangeArrI<bool, 1, maxNPCType, false> GFXNPCCustom;
 extern RangeArr<StdPicture, 0, maxNPCType> GFXNPCBMP;
 //Public GFXNPCMaskBMP(1 To maxNPCType) As StdPicture
 //extern RangeArr<StdPicture, 0, maxNPCType> GFXNPCMaskBMP;
+
+// removed (GFXNPC[Type].w/w used instead, only used by veggies originally)
 //Public GFXNPCHeight(1 To maxNPCType) As Integer
-extern RangeArrI<int, 1, maxNPCType, 0> GFXNPCHeight;
+// extern RangeArrI<int, 1, maxNPCType, 0> GFXNPCHeight;
 //Public GFXNPCWidth(1 To maxNPCType) As Integer
-extern RangeArrI<int, 1, maxNPCType, 0> GFXNPCWidth;
+// extern RangeArrI<int, 1, maxNPCType, 0> GFXNPCWidth;
+
 //Public GFXEffectCustom(1 To maxEffectType) As Boolean
 extern RangeArrI<bool, 1, maxEffectType, false> GFXEffectCustom;
 //Public GFXEffect(1 To maxEffectType) As Long

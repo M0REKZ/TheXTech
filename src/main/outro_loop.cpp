@@ -67,7 +67,7 @@ void DoCredits(bool quit)
     if(GameMenu)
         return;
 
-    int screenH_half = ScreenH / 2;
+    int TargetH_half = XRender::TargetH / 2;
 
     int shrink = vScreen[1].Top;
 
@@ -85,11 +85,11 @@ void DoCredits(bool quit)
         }
 
         CreditChop += 0.4f;
-        if(CreditChop >= static_cast<float>(screenH_half))
+        if(CreditChop >= static_cast<float>(TargetH_half))
         {
-            CreditChop = static_cast<float>(screenH_half);
+            CreditChop = static_cast<float>(TargetH_half);
             EndCredits++;
-            if(EndCredits == screenH_half)
+            if(EndCredits == TargetH_half)
             {
                 SetupCredits();
                 GameOutroDoQuit = true;
@@ -107,7 +107,7 @@ void DoCredits(bool quit)
         if(CreditChop < shrink)
             CreditChop = shrink;
 
-        if(CreditChop < screenH_half - 50 && !musicPlaying)
+        if(CreditChop < TargetH_half - 50 && !musicPlaying)
         {
             if(bgMusic[0] <= 0) // Play default music if no music set in outro level
             {
@@ -126,7 +126,7 @@ void DoCredits(bool quit)
 //        {
         if(quit)
         {
-            CreditChop = static_cast<float>(screenH_half);
+            CreditChop = static_cast<float>(TargetH_half);
             EndCredits = 0;
             XRender::clearBuffer();
             SetupCredits();
@@ -301,12 +301,14 @@ void SetupCredits()
     AddCredit(g_outroScreen.nameVitalyNovichkov);
     AddCredit("'Wohlstand'");
     AddCredit("");
-    AddCredit("'ds-sloth'");
+    AddCredit("ds-sloth"); // For the major contribution to the code and becoming a co-developer
     AddCredit("");
     AddCredit("");
     AddCredit(g_outroScreen.qualityControl);
     AddCredit("");
-    AddCredit("0lhi");
+    AddCredit("0lhi"); // Significant contribution to TheXTech development, testing, improvement process
+    AddCredit("");
+    AddCredit("");
 #endif
 #ifdef VITA
     AddCredit(g_outroScreen.psVitaPortBy);
@@ -355,10 +357,14 @@ void SetupCredits()
     AddCredit("Yingchun Soul"); // Idea for individual iceball shooting SFX and contribution with the "frozen NPC breaking" SFX
     AddCredit("MrDoubleA"); // Contribution with the "NPC got frozen" SFX
     AddCredit("Slash-18"); // Contribution with the better iceball shooting SFX
-    AddCredit("ds-sloth"); // For the major contribution to the code and becoming a co-developer
-    AddCredit("0lhi"); // Significant contribution to TheXTech development, testing, improvement process
     AddCredit("Eclipsed"); // For the help to verify and polish the speed-run mode
     AddCredit("ThatRoadRunnerfan727 (Matthew)"); // For Nintendo Switch alpha testing on hardware
+    AddCredit("RMN Community"); // For Quality Episodes that allowed us to refine the Engine
+    AddCredit("Savby"); // For important design work on the character select screen (ConnectScreen)
+    AddCredit("Otabo"); /* For the "Sarasaland Adventure" projects (both 1 and 2) that was being widely used in
+                           tests and debugs: and also, they introduced the SMBX to me (Vitaliy), in 2013
+                           and inspired me to all my future projects (Moondust Project and TheXTech).
+                        */  // --- P.S. Put all next lines under THIS comment line. ---
 #endif
     AddCredit("");
     AddCredit("4matsy");
@@ -434,7 +440,7 @@ void SetupCredits()
     AddCredit("");
     AddCredit(g_gameInfo.creditsHomePage);
 
-    CreditOffsetY = (ScreenH + 40);
+    CreditOffsetY = (XRender::TargetH + 40);
     CreditTotalHeight = 32.0;
 
     for(A = 1; A <= numCredits; A++)
@@ -442,7 +448,7 @@ void SetupCredits()
         auto &cr = Credit[A];
         cr.Location.Width = SuperTextPixLen(GetS(cr.Text), g_gameInfo.creditsFont);
         cr.Location.Height = 16;
-        cr.Location.X = (double(ScreenW) / 2) - (cr.Location.Width / 2.0);
+        cr.Location.X = (double(XRender::TargetW) / 2) - (cr.Location.Width / 2.0);
         cr.Location.Y = 32 * A;
         CreditTotalHeight += 32.0;
     }

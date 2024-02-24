@@ -106,6 +106,9 @@ string(TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER)
 
 if(CMAKE_BUILD_TYPE_LOWER STREQUAL "debug")
     add_definitions(-DDEBUG_BUILD)
+    if(CMAKE_COMPILER_IS_GNUCXX)
+        add_definitions(-D_GLIBCXX_DEBUG=1 -D_GLIBCXX_ASSERTIONS=1)
+    endif()
 endif()
 
 # Version
@@ -658,6 +661,7 @@ set(THEXTECH_SRC
     src/globals.cpp
     src/npc.cpp
     src/sound.cpp
+    src/sound_spatial.cpp
     src/frame_timer.cpp
     src/global_dirs.cpp
     src/global_strings.cpp
@@ -692,6 +696,8 @@ set(THEXTECH_SRC
     src/main/outro_loop.cpp
     src/main/trees.cpp
     src/main/block_table.cpp
+    src/main/asset_pack.cpp
+    src/main/screen_asset_pack.cpp
     src/graphics/gfx_update2.cpp
     src/graphics/gfx_update.cpp
     src/graphics/gfx_background.cpp
@@ -888,7 +894,6 @@ else()
         src/core/base/window_base.cpp
         src/core/base/msgbox_base.cpp
         src/core/base/events_base.cpp
-        src/core/sdl/init_sdl.cpp
         src/core/sdl/render_sdl.cpp
         src/core/sdl/window_sdl.cpp
         src/core/sdl/msgbox_sdl.cpp

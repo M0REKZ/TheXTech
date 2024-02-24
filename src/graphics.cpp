@@ -30,11 +30,13 @@
 
 #include "graphics/gfx_frame.h"
 #include "graphics/gfx_camera.h"
+#include "graphics/gfx_world.h"
 
 #include "pseudo_vb.h"
 #include "gfx.h"
 #include "config.h"
 #include "compat.h"
+#include "npc_traits.h"
 
 #include <Utils/maths.h>
 
@@ -59,11 +61,18 @@ void GetvScreen(vScreen_t& vscreen)
         vscreen.X += -vscreen.tempX;
         vscreen.Y += -vscreen.TempY;
 
+        // allow some overscan (needed for 3DS)
+        int allow_X = (g_compatibility.allow_multires && Screens[vscreen.screen_ref].player_count == 1 && !Screens[vscreen.screen_ref].is_canonical()) ? XRender::TargetOverscanX : 0;
+
+        // don't do overscan if at the level bounds
+        if(allow_X > 0 && level[p.Section].Width - level[p.Section].X <= vscreen.Width)
+            allow_X = 0;
+
         // shift the level so that it is onscreen
-        if(-vscreen.X < level[p.Section].X)
-            vscreen.X = -level[p.Section].X;
-        if(-vscreen.X + vscreen.Width > level[p.Section].Width)
-            vscreen.X = -(level[p.Section].Width - vscreen.Width);
+        if(-vscreen.X < level[p.Section].X - allow_X)
+            vscreen.X = -(level[p.Section].X - allow_X);
+        if(-vscreen.X + vscreen.Width > level[p.Section].Width + allow_X)
+            vscreen.X = -(level[p.Section].Width - vscreen.Width + allow_X);
         if(-vscreen.Y < level[p.Section].Y)
             vscreen.Y = -level[p.Section].Y;
         if(-vscreen.Y + vscreen.Height > level[p.Section].Height)
@@ -143,23 +152,21 @@ void GetvScreenAverage(vScreen_t& vscreen)
     vscreen.X = (vscreen.X / B) + (use_width * 0.5);
     vscreen.Y = (vscreen.Y / B) + (use_height * 0.5) - vScreenYOffset;
 
-    if(-vscreen.X < section.X)
-        vscreen.X = -section.X;
-    if(-vscreen.X + use_width > section.Width)
-        vscreen.X = -(section.Width - use_width);
+    // allow some overscan (needed for 3DS)
+    int allow_X = (g_compatibility.allow_multires && Screens[vscreen.screen_ref].player_count == 1 && !Screens[vscreen.screen_ref].is_canonical()) ? XRender::TargetOverscanX : 0;
+
+    // don't do overscan if at the level bounds
+    if(allow_X > 0 && section.Width - section.X <= vscreen.Width)
+        allow_X = 0;
+
+    if(-vscreen.X < section.X - allow_X)
+        vscreen.X = -(section.X - allow_X);
+    if(-vscreen.X + use_width > section.Width + allow_X)
+        vscreen.X = -(section.Width - use_width + allow_X);
     if(-vscreen.Y < section.Y)
         vscreen.Y = -section.Y;
     if(-vscreen.Y + use_height > section.Height)
         vscreen.Y = -(section.Height - use_height);
-
-    // keep vScreen boundary even (on 1x platforms)
-#ifdef PGE_MIN_PORT
-    vscreen.X += 1;
-    if(vscreen.X > 0)
-        vscreen.X -= std::fmod(vscreen.X, 2.);
-    else
-        vscreen.X += std::fmod(vscreen.X, 2.);
-#endif
 
     if(GameMenu)
     {
@@ -291,10 +298,17 @@ void GetvScreenAverage3(vScreen_t& vscreen)
     vscreen.X = -(l + r) / 2 + (use_width * 0.5);
     vscreen.Y = vscreen.Y / (plr_count + 1) + (use_height * 0.5) - vScreenYOffset;
 
-    if(-vscreen.X < section.X)
-        vscreen.X = -section.X;
-    if(-vscreen.X + use_width > section.Width)
-        vscreen.X = -(section.Width - use_width);
+    // allow some overscan (needed for 3DS)
+    int allow_X = (g_compatibility.allow_multires && Screens[vscreen.screen_ref].player_count == 1 && !Screens[vscreen.screen_ref].is_canonical()) ? XRender::TargetOverscanX : 0;
+
+    // don't do overscan if at the level bounds
+    if(allow_X > 0 && section.Width - section.X <= vscreen.Width)
+        allow_X = 0;
+
+    if(-vscreen.X < section.X - allow_X)
+        vscreen.X = -(section.X - allow_X);
+    if(-vscreen.X + use_width > section.Width + allow_X)
+        vscreen.X = -(section.Width - use_width + allow_X);
     if(-vscreen.Y < section.Y)
         vscreen.Y = -section.Y;
     if(-vscreen.Y + use_height > section.Height)
@@ -550,54 +564,11 @@ void ChangeScreen()
 //    If resChanged = True Then
     if(resChanged)
     {
-//        SetOrigRes
         SetOrigRes();
-//        DoEvents
         XEvents::doEvents();
-//        DeleteDC myBackBuffer
-//        DeleteObject myBufferBMP
-//        DoEvents
-//        myBackBuffer = CreateCompatibleDC(frmMain.hdc)
-//        myBufferBMP = CreateCompatibleBitmap(frmMain.hdc, 800, 600)
-//        SelectObject myBackBuffer, myBufferBMP
-//        frmMain.BorderStyle = 2
-//        frmMain.Caption = "Super Mario Bros. X - Version 1.3 - www.SuperMarioBrothers.org"
-//        frmMain.Left = 0
-//        frmMain.Top = 0
-//    Else
     } else {
-//        If frmMain.WindowState = 2 Then
-//            frmMain.WindowState = 0
-//        End If
-//        frmMain.Width = 12240
-//        frmMain.Height = 9570
-//        Do While frmMain.ScaleWidth > 800
-//            frmMain.Width += -5
-//        Loop
-//        Do While frmMain.ScaleHeight > 600
-//            frmMain.Height += -5
-//        Loop
-//        Do While frmMain.ScaleWidth < 800
-//            frmMain.Width += 5
-//        Loop
-//        Do While frmMain.ScaleHeight < 600
-//            frmMain.Height += 5
-//        Loop
-//        SetRes
-        SetRes();
-//        DoEvents
+        ChangeRes(0, 0, 0, 0);
         XEvents::doEvents();
-//        DeleteDC myBackBuffer
-//        DeleteObject myBufferBMP
-//        DoEvents
-//        myBackBuffer = CreateCompatibleDC(frmMain.hdc)
-//        myBufferBMP = CreateCompatibleBitmap(frmMain.hdc, 800, 600)
-//        SelectObject myBackBuffer, myBufferBMP
-//        frmMain.BorderStyle = 0
-//        frmMain.Caption = ""
-//        frmMain.Left = 0
-//        frmMain.Top = 0
-//    End If
     }
 //    SaveConfig
     SaveConfig();
@@ -733,10 +704,13 @@ void ScreenShot()
 
 void DrawFrozenNPC(int Z, int A)
 {
+    double camX = vScreen[Z].CameraAddX();
+    double camY = vScreen[Z].CameraAddY();
+
     auto &n = NPC[A];
     if((vScreenCollision(Z, n.Location) ||
-        vScreenCollision(Z, newLoc(n.Location.X - (NPCWidthGFX[n.Type] - n.Location.Width) / 2,
-                            n.Location.Y, CDbl(NPCWidthGFX[n.Type]), CDbl(NPCHeight[n.Type])))) && !n.Hidden)
+        vScreenCollision(Z, newLoc(n.Location.X - (n->WidthGFX - n.Location.Width) / 2,
+                            n.Location.Y, CDbl(n->WidthGFX), CDbl(n->THeight)))) && !n.Hidden)
     {
 // draw npc
         XTColor c = n.Shadow ? XTColor(0, 0, 0) : XTColor();
@@ -748,29 +722,29 @@ void DrawFrozenNPC(int Z, int A)
         // Draw frozen NPC body in only condition the content value is valid
         if(content > 0 && content <= maxNPCType)
         {
-             XRender::renderTexture(float(vScreen[Z].X + n.Location.X + 2),
-                                    float(vScreen[Z].Y + n.Location.Y + 2),
+             XRender::renderTexture(float(camX + n.Location.X + 2),
+                                    float(camY + n.Location.Y + 2),
                                     float(n.Location.Width - 4),
                                     float(n.Location.Height - 4),
                                     GFXNPCBMP[content],
-                                    2, 2 + contentFrame * NPCHeight[content], c);
+                                    2, 2 + contentFrame * NPCHeight(content), c);
         }
 
         // draw ice
-         XRender::renderTexture(float(vScreen[Z].X + n.Location.X + NPCFrameOffsetX[n.Type]),
-                                float(vScreen[Z].Y + n.Location.Y + NPCFrameOffsetY[n.Type]),
+         XRender::renderTexture(float(camX + n.Location.X + n->FrameOffsetX),
+                                float(camY + n.Location.Y + n->FrameOffsetY),
                                 float(n.Location.Width - 6), float(n.Location.Height - 6),
                                 GFXNPCBMP[n.Type], 0, 0, c);
-         XRender::renderTexture(float(vScreen[Z].X + n.Location.X + NPCFrameOffsetX[n.Type] + n.Location.Width - 6),
-                                float(vScreen[Z].Y + n.Location.Y + NPCFrameOffsetY[n.Type]),
+         XRender::renderTexture(float(camX + n.Location.X + n->FrameOffsetX + n.Location.Width - 6),
+                                float(camY + n.Location.Y + n->FrameOffsetY),
                                 6, float(n.Location.Height - 6),
                                 GFXNPCBMP[n.Type], 128 - 6, 0, c);
-         XRender::renderTexture(float(vScreen[Z].X + n.Location.X + NPCFrameOffsetX[n.Type]),
-                                float(vScreen[Z].Y + n.Location.Y + NPCFrameOffsetY[n.Type] + n.Location.Height - 6),
+         XRender::renderTexture(float(camX + n.Location.X + n->FrameOffsetX),
+                                float(camY + n.Location.Y + n->FrameOffsetY + n.Location.Height - 6),
                                 float(n.Location.Width - 6), 6,
                                 GFXNPCBMP[n.Type], 0, 128 - 6, c);
-         XRender::renderTexture(float(vScreen[Z].X + n.Location.X + NPCFrameOffsetX[n.Type] + n.Location.Width - 6),
-                                float(vScreen[Z].Y + n.Location.Y + NPCFrameOffsetY[n.Type] + n.Location.Height - 6),
+         XRender::renderTexture(float(camX + n.Location.X + n->FrameOffsetX + n.Location.Width - 6),
+                                float(camY + n.Location.Y + n->FrameOffsetY + n.Location.Height - 6),
                                 6, 6, GFXNPCBMP[n.Type],
                                 128 - 6, 128 - 6, c);
     }
@@ -791,35 +765,75 @@ Location_t WorldLevel_t::LocationGFX()
     return ret;
 }
 
+Location_t WorldLevel_t::LocationOnscreen()
+{
+    Location_t ret = LocationGFX();
+
+    if(Path2)
+    {
+        if(ret.Height < 40)
+            ret.Height = 40;
+
+        if(ret.Width < 64)
+        {
+            ret.X += (ret.Width - 64) / 2;
+            ret.Width = 64;
+        }
+    }
+
+    return ret;
+}
+
 void DrawBackdrop(const Screen_t& screen)
 {
     if(GFX.Backdrop.inited)
     {
         bool border_valid = GFX.Backdrop_Border.tex.inited && (!GFX.isCustom(71) || GFX.isCustom(72));
 
+        // special case for world map
+        if(LevelSelect && !GameMenu && !GameOutro && !LevelEditor)
+        {
+            Location_t full = newLoc(0, 0, XRender::TargetW, XRender::TargetH);
+            Location_t inner = newLoc(screen.TargetX(), screen.TargetY(), screen.W, screen.H);
+
+            // if world map frame assets missing, use the 800x600 area isntead
+            if(!worldHasFrameAssets())
+            {
+                inner.X = screen.vScreen(1).TargetX() - 66;
+                inner.Y = screen.vScreen(1).TargetY() - 130;
+                inner.Width = 800;
+                inner.Height = 600;
+            }
+
+            RenderFrameBorder(full, inner,
+                GFX.Backdrop, border_valid ? &GFX.Backdrop_Border : nullptr);
+
+            return;
+        }
+
         for(int i = screen.active_begin(); i < screen.active_end(); i++)
         {
             const auto& s = screen.vScreen(i + 1);
 
-            Location_t full = newLoc(0, 0, screen.W, screen.H);
+            Location_t full = newLoc(0, 0, XRender::TargetW, XRender::TargetH);
             // horizontal
             if(screen.Type == 4 || (screen.Type == 5 && (screen.DType == 1 || screen.DType == 2)))
             {
-                full.Width = screen.W / 2;
+                full.Width = XRender::TargetW / 2;
                 // our screen on right
                 if(((screen.Type == 4 || (screen.Type == 5 && screen.DType == 1)) && i == 1) || (screen.DType == 2 && i == 0))
-                    full.X = ScreenW / 2;
+                    full.X = XRender::TargetW / 2;
             }
             // vertical
             else if(screen.Type == 1 || (screen.Type == 5 && (screen.DType == 3 || screen.DType == 4 || screen.DType == 6)))
             {
-                full.Height = screen.H / 2;
+                full.Height = XRender::TargetH / 2;
                 // our screen on bottom
                 if(((screen.Type == 1 || (screen.Type == 5 && (screen.DType == 3 || screen.DType == 6))) && i == 1) || (screen.DType == 4 && i == 0))
-                    full.Y = screen.H / 2;
+                    full.Y = XRender::TargetH / 2;
             }
 
-            RenderFrameBorder(full, newLoc(s.ScreenLeft, s.ScreenTop, s.Width, s.Height),
+            RenderFrameBorder(full, newLoc(s.TargetX(), s.TargetY(), s.Width, s.Height),
                 GFX.Backdrop, border_valid ? &GFX.Backdrop_Border : nullptr);
         }
     }

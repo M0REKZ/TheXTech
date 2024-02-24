@@ -237,6 +237,14 @@ static void read_header()
     pLogDebug("Attempt to load level file %s for the replay", FullFileName.c_str());
 
     thisHash = md5::file_to_hashGC(FullFileName);
+
+    if(thisHash.empty())
+    {
+        FullFileName = AppPath + FullFileName;
+        pLogDebug("Not found; attempt to load level file %s for the replay", FullFileName.c_str());
+        thisHash = md5::file_to_hashGC(FullFileName);
+    }
+
     if(thisHash.empty())
         pLogCritical("Failed to retrieve the MD5 hash for %s file (probably, it doesn't exist)", FullFileName.c_str());
 
@@ -295,6 +303,8 @@ static void read_header()
 
     for(int A = 1; A <= numPlayers; A++)
     {
+        int HeldBonus = NPCID(0);
+
         if(recordVersion < 3)
             fscanf(replay_file,
                    "Player\r\n"
@@ -302,7 +312,7 @@ static void read_header()
                    "State %d\r\n"
                    "MountType %d\r\n"
                    "HeldBonus %d\r\n",
-                &Player[A].Character, &Player[A].State, &Player[A].MountType, &Player[A].HeldBonus);
+                &Player[A].Character, &Player[A].State, &Player[A].MountType, &HeldBonus);
         else
             fscanf(replay_file,
                    "Player\r\n"
@@ -311,7 +321,9 @@ static void read_header()
                    "Mount %d\r\n"
                    "MountType %d\r\n"
                    "HeldBonus %d\r\n",
-                &Player[A].Character, &Player[A].State, &Player[A].Mount, &Player[A].MountType, &Player[A].HeldBonus);
+                &Player[A].Character, &Player[A].State, &Player[A].Mount, &Player[A].MountType, &HeldBonus);
+
+        Player[A].HeldBonus = NPCID(HeldBonus);
     }
 
     Cheater = true; // important to avoid losing player save data in replay mode.

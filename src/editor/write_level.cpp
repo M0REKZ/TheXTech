@@ -24,6 +24,7 @@
 #include "write_common.h"
 #include "sound.h"
 #include "npc_id.h"
+#include "npc_traits.h"
 #include "npc_special_data.h"
 #include <PGE_File_Formats/file_formats.h>
 #include <AppPath/app_path.h>
@@ -103,6 +104,10 @@ void SaveLevel(const std::string& FilePath, int format, int version)   // saves 
     //     FileNamePath = Left(FileNamePath, Len(FileNamePath) - 1)
     // End If
 
+    // Level-wide settings
+    out.LevelName = LevelName;
+
+    // sections
     for(int i = 0; i < numSections; ++i)
     {
         const auto &s = level[i];
@@ -192,9 +197,9 @@ void SaveLevel(const std::string& FilePath, int format, int version)   // saves 
         bgo.y = b.Location.Y;
         bgo.layer = GetL(b.Layer);
 
-        bgo.z_mode = b.zMode;
-        bgo.z_offset = b.zOffset;
-        bgo.smbx64_sp = bgo.z_mode == LevelBGO::ZDefault ? b.SortPriority : -1;
+        bgo.z_mode = b.GetCustomLayer();
+        bgo.z_offset = b.GetCustomOffset();
+        // bgo.smbx64_sp = bgo.z_mode == LevelBGO::ZDefault ? b.SortPriority : -1;
 
         // fix this to update as needed
         if(bgo.layer.empty())
@@ -227,12 +232,12 @@ void SaveLevel(const std::string& FilePath, int format, int version)   // saves 
             npc.special_data = n.Special2;
         }
         // AI / firebar length
-        else if(n.Type == NPCID_FIRE_CHAIN || NPCIsAParaTroopa[n.Type] || NPCIsCheep[n.Type])
+        else if(n.Type == NPCID_FIRE_CHAIN || NPCIsAParaTroopa(n) || n->IsFish)
         {
             npc.special_data = n.Special;
         }
         // Star ID if >0
-        else if(n.Type == NPCID_STAR_EXIT || n.Type == NPCID_STAR_COLLECT)
+        else if(n.Type == NPCID_STAR_EXIT || n.Type == NPCID_STAR_COLLECT || n.Type == NPCID_MEDAL)
         {
             npc.special_data = int(n.Variant);
         }

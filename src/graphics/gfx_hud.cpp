@@ -26,10 +26,12 @@
 #include "../core/render.h"
 #include "../core/power.h"
 #include "../gfx.h"
+#include "npc_traits.h"
 
 #include "video.h"
 #include "main/speedrunner.h"
 
+#include "compat.h"
 #include "config.h"
 #include "main/level_medals.h"
 
@@ -44,7 +46,6 @@ void DrawInterface(int Z, int numScreens)
 
     std::string scoreStr = std::to_string(Score);
     std::string coinsStr = std::to_string(Coins);
-    std::string livesStr = std::to_string(int(Lives));
     std::string numStarsStr = std::to_string(numStars);
 
     XRender::offsetViewportIgnore(true);
@@ -114,7 +115,7 @@ void DrawInterface(int Z, int numScreens)
             {
                 XRender::renderTexture(plr_center - GFX.Container[1].w / 2 + 12,
                                         ScreenTop + 16 + 12,
-                                        NPCWidth[plr.HeldBonus], NPCHeight[plr.HeldBonus],
+                                        NPCWidth(plr.HeldBonus), NPCHeight(plr.HeldBonus),
                                         GFXNPC[plr.HeldBonus], 0, 0);
             }
         }
@@ -176,13 +177,9 @@ void DrawInterface(int Z, int numScreens)
 
         // Print lives on the screen
         int lives_stars_x = left_margin - 60; // excludes life / star icon width
-        XRender::renderTexture(lives_stars_x - GFX.Interface[3].w, ScreenTop + 16 + 10, GFX.Interface[3]);
-        XRender::renderTexture(lives_stars_x + 8, ScreenTop + 16 + 11, GFX.Interface[1]);
-
         int lives_stars_text_left = lives_stars_x + 8 + GFX.Interface[1].w + 8;
-        SuperPrint(livesStr, 1,
-                   lives_stars_text_left,
-                   ScreenTop + 16 + 11);
+
+        DrawLives(lives_stars_x, ScreenTop + 16 + 10, Lives, g_100s);
 
         // Print stars on the screen
         if(numStars > 0)
@@ -267,13 +264,56 @@ void DrawInterface(int Z, int numScreens)
     XRender::offsetViewportIgnore(false);
 }
 
+void DrawLives(int X, int Y, int lives, int hunds)
+{
+    bool show_times = true;
+    int count = 0;
+    int text_X = X + 8 + GFX.Interface[1].w + 8;
+
+    if(g_compatibility.modern_lives_system)
+    {
+        bool debt = (hunds < 0);
+        count = (debt) ? -hunds : hunds;
+
+        if(GFX.Balance.inited)
+            XRender::renderTexture(X - GFX.Balance.w / 2, Y, GFX.Balance.w / 2, GFX.Balance.h, GFX.Balance, debt * GFX.Balance.w / 2, 0);
+        else
+        {
+            XRender::renderTexture(X - GFX.Interface[2].w,      Y, GFX.Interface[2], XTColor(0x7F, 0x7F * !debt, 0x7F * !debt));
+            XRender::renderTexture(X - GFX.Interface[2].w - 8,  Y, GFX.Interface[2], XTColor(0xBF, 0xBF * !debt, 0xBF * !debt));
+            XRender::renderTexture(X - GFX.Interface[2].w - 16, Y, GFX.Interface[2], XTColor(0xFF, 0xFF * !debt, 0xFF * !debt));
+        }
+
+        if(count >= 100)
+        {
+            show_times = false;
+            text_X -= 18;
+        }
+
+        if(count >= 1000)
+            text_X -= 10;
+    }
+    else
+    {
+        count = lives;
+        XRender::renderTexture(X - GFX.Interface[3].w, Y, GFX.Interface[3]);
+    }
+
+    if(show_times)
+        XRender::renderTexture(X + 8, Y + 1, GFX.Interface[1]);
+
+    SuperPrint(std::to_string(count), 1,
+               text_X,
+               Y + 1);
+}
+
 enum class MedalDrawLevel
 {
     Off = 0, Prev, Got, Shiny
 };
 
 //! helper function to draw a single medal at a specific top-left position and acquisition level
-static inline void s_DrawMedal(int x, int y, int coin_width, int coin_height, MedalDrawLevel level)
+static inline void s_DrawMedal(int i, int x, int y, int coin_width, int coin_height, MedalDrawLevel level)
 {
     if(GFX.Medals.inited)
     {
@@ -292,7 +332,7 @@ static inline void s_DrawMedal(int x, int y, int coin_width, int coin_height, Me
     // render sparkles for shiny
     if(level == MedalDrawLevel::Shiny)
     {
-        int sparkle_1_idx = ((CommonFrame + x * 37) % 1024) / 16; // on frame 3
+        int sparkle_1_idx = ((CommonFrame + i * 16 * 37) % 1024) / 16; // on frame 3
 
         for(int i = 0; i < 3; ++i)
         {
@@ -362,15 +402,15 @@ void DrawMedals(int X, int Y, bool warp, uint8_t max, uint8_t prev, uint8_t ckpt
             int X_i = X + coin_width * i;
 
             if((best & bit) && show_shiny)
-                s_DrawMedal(X_i, Y, coin_width, coin_height, MedalDrawLevel::Shiny);
+                s_DrawMedal(i, X_i, Y, coin_width, coin_height, MedalDrawLevel::Shiny);
             else if(got & bit)
-                s_DrawMedal(X_i, Y, coin_width, coin_height, MedalDrawLevel::Got);
+                s_DrawMedal(i, X_i, Y, coin_width, coin_height, MedalDrawLevel::Got);
             else if(ckpt & bit && (CommonFrame % 64) < 32)
-                s_DrawMedal(X_i, Y, coin_width, coin_height, MedalDrawLevel::Got);
+                s_DrawMedal(i, X_i, Y, coin_width, coin_height, MedalDrawLevel::Got);
             else if(prev & bit)
-                s_DrawMedal(X_i, Y, coin_width, coin_height, MedalDrawLevel::Prev);
+                s_DrawMedal(i, X_i, Y, coin_width, coin_height, MedalDrawLevel::Prev);
             else
-                s_DrawMedal(X_i, Y, coin_width, coin_height, MedalDrawLevel::Off);
+                s_DrawMedal(i, X_i, Y, coin_width, coin_height, MedalDrawLevel::Off);
         }
 
         return;
@@ -413,7 +453,7 @@ void DrawMedals(int X, int Y, bool warp, uint8_t max, uint8_t prev, uint8_t ckpt
         X -= total_len;
 
     // draw scene
-    s_DrawMedal(X, Y, coin_width, coin_height, show_shiny ? MedalDrawLevel::Shiny : MedalDrawLevel::Got);
+    s_DrawMedal(0, X, Y, coin_width, coin_height, show_shiny ? MedalDrawLevel::Shiny : MedalDrawLevel::Got);
     X += coin_width + 8;
     XRender::renderTexture(X, Y, GFX.Interface[1]);
     X += GFX.Interface[1].w + 4;
@@ -455,7 +495,7 @@ void DrawDeviceBattery()
     {
         int bw = 40;
         int bh = 22;
-        int bx = ScreenW - (bw + 8);
+        int bx = XRender::TargetW - XRender::TargetOverscanX - (bw + 8);
         int by = 24;
 
         RenderPowerInfo(0, bx, by, bw, bh, 255, &status_info);

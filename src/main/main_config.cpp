@@ -26,10 +26,13 @@
 #include "../video.h"
 #include "../controls.h"
 
+#include "core/render.h"
+
 #include "sdl_proxy/sdl_audio.h"
 
 #include "speedrunner.h"
 #include "presetup.h"
+#include "main/asset_pack.h"
 
 #include <Utils/files.h>
 #include <Utils/strings.h>
@@ -146,6 +149,9 @@ void OpenConfig_preSetup()
 
     InitSoundDefaults();
 
+    g_pLogGlobalSetup.logPathDefault = AppPathManager::logsDir();
+    g_pLogGlobalSetup.logPathFallBack = AppPathManager::userAppDirSTD();
+
     if(Files::fileExists(configPath))
     {
         IniProcessing config(configPath);
@@ -158,8 +164,6 @@ void OpenConfig_preSetup()
         config.read("log-path", g_pLogGlobalSetup.logPathCustom, std::string());
         config.read("max-log-count", g_pLogGlobalSetup.maxFilesCount, 10);
         config.readEnum("log-level", g_pLogGlobalSetup.level, c_defaultLogLevel, logLevelEnum);
-        g_pLogGlobalSetup.logPathDefault = AppPathManager::logsDir();
-        g_pLogGlobalSetup.logPathFallBack = AppPathManager::userAppDirSTD();
         config.endGroup();
 
         config.beginGroup("video");
@@ -179,18 +183,24 @@ void OpenConfig_preSetup()
         config.read("internal-width", g_config.InternalW, 800);
         config.read("internal-height", g_config.InternalH, 600);
 
-        ScreenW = g_config.InternalW;
-        ScreenH = g_config.InternalH;
+        // resolution smaller than CGA? forbid it!
+        if(g_config.InternalW > 0 && g_config.InternalW < 320)
+            g_config.InternalW = 320;
+        if(g_config.InternalH > 0 && g_config.InternalH < 200)
+            g_config.InternalH = 200;
+
+        XRender::TargetW = g_config.InternalW;
+        XRender::TargetH = g_config.InternalH;
         // default res for full dynamic res
-        if(ScreenH == 0)
+        if(XRender::TargetH == 0)
         {
-            ScreenW = 1280;
-            ScreenH = 720;
+            XRender::TargetW = 1280;
+            XRender::TargetH = 720;
         }
         // default res for dynamic width
-        else if(ScreenW == 0)
+        else if(XRender::TargetW == 0)
         {
-            ScreenW = 800;
+            XRender::TargetW = 800;
         }
 
         IniProcessing::StrEnumMap scaleModes =
@@ -220,11 +230,39 @@ void OpenConfig_preSetup()
         config.readEnum("compatibility-mode", g_preSetup.compatibilityMode, 0, compatMode);
         config.endGroup();
 
+        config.beginGroup("recent");
+        config.read("asset-pack", g_preSetup.assetPack, std::string());
+        config.endGroup();
+
         config.beginGroup("speedrun");
         config.read("mode", g_preSetup.speedRunMode, 0);
         config.read("semi-transparent-timer", g_preSetup.speedRunSemiTransparentTimer, false);
         config.readEnum("blink-effect", g_preSetup.speedRunEffectBlink, (int)SPEEDRUN_EFFECT_BLINK_UNDEFINED, speedRunBlinkMode);
         config.endGroup();
+    }
+}
+
+
+void ConfigReloadRecentEpisodes()
+{
+    // reload recently used episodes for the new asset pack
+    std::string configPath = AppPathManager::settingsFileSTD();
+
+    if(Files::fileExists(configPath))
+    {
+        IniProcessing config(configPath);
+
+        std::string asset_pack_prefix = g_AssetPackID;
+        if(!asset_pack_prefix.empty())
+            asset_pack_prefix += '-';
+
+        config.beginGroup("recent");
+        config.read((asset_pack_prefix + "episode-1p").c_str(), g_recentWorld1p, std::string());
+        config.read((asset_pack_prefix + "episode-2p").c_str(), g_recentWorld2p, std::string());
+        config.read((asset_pack_prefix + "episode-editor").c_str(), g_recentWorldEditor, std::string());
+        config.endGroup();
+
+        pLogDebug("Loaded recent episodes for asset pack [id: %s] from [%s]", g_AssetPackID.c_str(), configPath.c_str());
     }
 }
 
@@ -296,26 +334,23 @@ void OpenConfig()
         config.read("use-native-osk", g_config.use_native_osk, false);
         config.read("new-editor", g_config.enable_editor, false);
         config.read("enable-editor", g_config.enable_editor, g_config.enable_editor);
-        config.read("editor-edge-scroll", g_config.editor_edge_scroll, g_config.editor_edge_scroll);
         config.endGroup();
-
-#if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
-        constexpr bool osk_fill_screen_default = true;
-#else
-        constexpr bool osk_fill_screen_default = false;
-#endif
 
         config.beginGroup("video");
         config.read("display-controllers", g_drawController, false);
+        config.read("show-fails-counter", g_config.show_fails_counter, true);
         config.readEnum("battery-status", g_videoSettings.batteryStatus, (int)BATTERY_STATUS_OFF, batteryStatus);
-        config.read("osk-fill-screen", g_config.osk_fill_screen, osk_fill_screen_default);
         config.readEnum("show-episode-title", g_config.show_episode_title, (int)Config_t::EPISODE_TITLE_OFF, showEpisodeTitle);
         config.endGroup();
 
+        std::string asset_pack_prefix = g_AssetPackID;
+        if(!asset_pack_prefix.empty())
+            asset_pack_prefix += '-';
+
         config.beginGroup("recent");
-        config.read("episode-1p", g_recentWorld1p, std::string());
-        config.read("episode-2p", g_recentWorld2p, std::string());
-        config.read("episode-editor", g_recentWorldEditor, std::string());
+        config.read((asset_pack_prefix + "episode-1p").c_str(), g_recentWorld1p, std::string());
+        config.read((asset_pack_prefix + "episode-2p").c_str(), g_recentWorld2p, std::string());
+        config.read((asset_pack_prefix + "episode-editor").c_str(), g_recentWorldEditor, std::string());
         config.endGroup();
 
         config.beginGroup("gameplay");
@@ -380,7 +415,6 @@ void SaveConfig()
     config.setValue("record-gameplay", g_config.RecordGameplayData);
     config.setValue("use-native-osk", g_config.use_native_osk);
     config.setValue("enable-editor", g_config.enable_editor);
-    config.setValue("editor-edge-scroll", g_config.editor_edge_scroll);
     config.setValue("language", g_config.language);
     config.endGroup();
 
@@ -403,10 +437,15 @@ void SaveConfig()
     }
     config.endGroup();
 
+    std::string asset_pack_prefix = g_AssetPackID;
+    if(!asset_pack_prefix.empty())
+        asset_pack_prefix += '-';
+
     config.beginGroup("recent");
-    config.setValue("episode-1p", g_recentWorld1p);
-    config.setValue("episode-2p", g_recentWorld2p);
-    config.setValue("episode-editor", g_recentWorldEditor);
+    config.setValue("asset-pack", g_AssetPackID);
+    config.setValue((asset_pack_prefix + "episode-1p").c_str(), g_recentWorld1p);
+    config.setValue((asset_pack_prefix + "episode-2p").c_str(), g_recentWorld2p);
+    config.setValue((asset_pack_prefix + "episode-editor").c_str(), g_recentWorldEditor);
     config.endGroup();
 
     config.beginGroup("video");
@@ -448,13 +487,13 @@ void SaveConfig()
         config.setValue("render", renderMode[g_videoSettings.renderMode]);
         config.setValue("vsync", g_videoSettings.vSync);
         config.setValue("background-work", g_videoSettings.allowBgWork);
+        config.setValue("show-fails-counter", g_config.show_fails_counter);
         config.setValue("background-controller-input", g_videoSettings.allowBgControllerInput);
         config.setValue("frame-skip", g_videoSettings.enableFrameSkip);
         config.setValue("show-fps", g_videoSettings.showFrameRate);
         config.setValue("scale-down-textures", scaleDownTextures[g_videoSettings.scaleDownTextures]);
         config.setValue("display-controllers", g_drawController);
         config.setValue("battery-status", batteryStatus[g_videoSettings.batteryStatus]);
-        config.setValue("osk-fill-screen", g_config.osk_fill_screen);
         config.setValue("show-episode-title", showEpisodeTitle[g_config.show_episode_title]);
         config.setValue("internal-width", g_config.InternalW);
         config.setValue("internal-height", g_config.InternalH);

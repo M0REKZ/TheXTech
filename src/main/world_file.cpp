@@ -21,10 +21,7 @@
 #include "sdl_proxy/sdl_stdinc.h"
 #include "sdl_proxy/sdl_timer.h"
 
-#ifdef __16M__
-// used to clear loaded textures on level/world load
 #include "core/render.h"
-#endif
 
 #include "../globals.h"
 #include "../frame_timer.h"
@@ -58,7 +55,6 @@ bool OpenWorld(std::string FilePath)
     // USE PGE-FL here
     // std::string newInput = "";
     int FileRelease = 64;
-    bool compatModern = (CompatGetLevel() == COMPAT_MODERN);
     int A = 0;
     int B = 0;
     // long long zCounter = 0;
@@ -133,17 +129,17 @@ bool OpenWorld(std::string FilePath)
     blockCharacter[1] = wld.nocharacter1;
     blockCharacter[2] = wld.nocharacter2;
 
-    if(FileRelease >= 30 || !compatModern)
+    // previously checked FileRelease here
+    // if(FileRelease >= 30 || !compatModern)
+    blockCharacter[3] = wld.nocharacter3;
+    blockCharacter[4] = wld.nocharacter4;
+    blockCharacter[5] = wld.nocharacter5;
+
+    // cancel block if cheat is active
+    if(g_forceCharacter && !LevelEditor && !WorldEditor)
     {
-        blockCharacter[3] = wld.nocharacter3;
-        blockCharacter[4] = wld.nocharacter4;
-        blockCharacter[5] = wld.nocharacter5;
-    }
-    else
-    {
-        blockCharacter[3] = true;
-        blockCharacter[4] = true;
-        blockCharacter[5] = true;
+        for(int A = 1; A <= numCharacters; A++)
+            blockCharacter[A] = false;
     }
 
     StartLevel = wld.IntroLevel_file;
@@ -377,6 +373,8 @@ bool OpenWorld(std::string FilePath)
 
     LoadCustomSound();
 
+    // the version targeting below is from SMBX 1.3
+
     if(!LevelEditor)
     {
         for(A = 1; A <= numWorldLevels; A++)
@@ -409,8 +407,8 @@ bool OpenWorld(std::string FilePath)
                 ll.Start = true;
         }
 
-        vScreen[1].X = (ScreenW / 2) - (800 / 2);
-        vScreen[1].Y = (ScreenH / 2) - (600 / 2);
+        vScreen[1].X = (XRender::TargetW / 2) - (800 / 2);
+        vScreen[1].Y = (XRender::TargetH / 2) - (600 / 2);
     }
 //    else
 //    {
@@ -464,6 +462,8 @@ void ClearWorld(bool quick)
         WorldLevel[A] = WorldLevel_t();
     for(A = 1; A <= numWorldMusic; A++)
         WorldMusic[A] = WorldMusic_t();
+
+    WorldPlayer[1] = WorldPlayer_t();
 
     if(!quick)
     {
@@ -621,6 +621,16 @@ bool CanConvertWorld(int format, std::string* reasons)
         }
     }
 
+    if(numWorldAreas > 0)
+    {
+        can_convert = false;
+        if(reasons)
+        {
+            *reasons = g_editorStrings.fileConvertFeatureLevelStarDisplay;
+            *reasons += '\n';
+        }
+    }
+
     return can_convert;
 }
 
@@ -647,14 +657,12 @@ void ConvertWorld(int format)
         return;
 
     for(int i = 1; i <= numWorldMusic; i++)
-    {
         SetS(WorldMusic[i].MusicFile, "");
-    }
 
     WorldStarsShowPolicy = WorldData::STARS_UNSPECIFIED;
 
     for(int i = 1; i <= numWorldLevels; i++)
-    {
         WorldLevel[i].starsShowPolicy = WorldData::STARS_UNSPECIFIED;
-    }
+
+    numWorldAreas = 0;
 }

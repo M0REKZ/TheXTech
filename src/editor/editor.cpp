@@ -58,6 +58,7 @@
 #include "controls.h"
 
 #include "pseudo_vb.h"
+#include "npc_traits.h"
 #include "npc_id.h"
 #include "eff_id.h"
 
@@ -114,6 +115,9 @@ void ResetSectionScrolls()
 {
     int p1_section = 0;
 
+    // use screen 0 for section scrolls
+    const Screen_t& screen = Screens[0];
+
     for(int i = 0; i <= maxSections; i++)
     {
         // initialize the section
@@ -138,7 +142,7 @@ void ResetSectionScrolls()
         }
 
         // normally start at bottom-left
-        last_vScreenY[i] = -(level[i].Height - ScreenH);
+        last_vScreenY[i] = -(level[i].Height - screen.H);
         last_vScreenX[i] = -(level[i].X);
 
         // if player start is in section, start there instead
@@ -148,19 +152,19 @@ void ResetSectionScrolls()
                 && PlayerStart[p].Y >= level[i].Y && PlayerStart[p].Y + PlayerStart[p].Height <= level[i].Height)
             {
                 // center on player
-                last_vScreenX[i] = -(PlayerStart[p].X + PlayerStart[p].Width / 2 - ScreenW / 2);
-                last_vScreenY[i] = -(PlayerStart[p].Y + PlayerStart[p].Height / 2 - ScreenH / 2);
+                last_vScreenX[i] = -(PlayerStart[p].X + PlayerStart[p].Width / 2 - screen.W / 2);
+                last_vScreenY[i] = -(PlayerStart[p].Y + PlayerStart[p].Height / 2 - screen.H / 2);
 
                 // check section bounds
                 if(-last_vScreenX[i] < level[i].X)
                     last_vScreenX[i] = -level[i].X;
-                else if(-last_vScreenX[i] + ScreenW > level[i].Width)
-                    last_vScreenX[i] = -(level[i].Width - ScreenW);
+                else if(-last_vScreenX[i] + screen.W > level[i].Width)
+                    last_vScreenX[i] = -(level[i].Width - screen.W);
 
                 if(-last_vScreenY[i] < level[i].Y)
                     last_vScreenY[i] = -level[i].Y;
-                else if(-last_vScreenY[i] + ScreenH > level[i].Height)
-                    last_vScreenY[i] = -(level[i].Height - ScreenH);
+                else if(-last_vScreenY[i] + screen.H > level[i].Height)
+                    last_vScreenY[i] = -(level[i].Height - screen.H);
 
                 // save P1 section
                 if(p == 1)
@@ -172,10 +176,10 @@ void ResetSectionScrolls()
         }
 
         // center on section if screen bigger
-        if(level[i].Width - level[i].X < ScreenW)
-            last_vScreenX[i] += ScreenW / 2 - (level[i].Width - level[i].X) / 2;
-        if(level[i].Height - level[i].Y < ScreenH)
-            last_vScreenY[i] = -level[i].Y + ScreenH / 2 - (level[i].Height - level[i].Y) / 2;
+        if(level[i].Width - level[i].X < screen.W)
+            last_vScreenX[i] += screen.W / 2 - (level[i].Width - level[i].X) / 2;
+        if(level[i].Height - level[i].Y < screen.H)
+            last_vScreenY[i] = -level[i].Y + screen.H / 2 - (level[i].Height - level[i].Y) / 2;
 
         // align to grid
         if(std::fmod((last_vScreenY[i] + 8), 32) != 0.0)
@@ -339,7 +343,7 @@ void UpdateEditor()
     }
 
 
-    // if(!XWindow::hasWindowMouseFocus() || SharedCursor.X < 0 || SharedCursor.Y > ScreenW || SharedCursor.Y < 0 || SharedCursor.Y > ScreenH)
+    // if(!XWindow::hasWindowMouseFocus() || SharedCursor.X < 0 || SharedCursor.Y > XRender::TargetW || SharedCursor.Y < 0 || SharedCursor.Y > XRender::TargetH)
     //     HideCursor();
 
     if(LevelEditor || MagicHand)
@@ -430,8 +434,8 @@ void UpdateEditor()
                             OptCursorSync();
 
                             EditorCursor.Mode = OptCursor_t::LVL_NPCS;
-                            ResetNPC(A);
                             EditorCursor.NPC = NPC[A];
+                            ResetNPC(EditorCursor.NPC.Type);
                             EditorCursor.NPC.Hidden = false;
                             EditorCursor.Layer = NPC[A].Layer;
                             EditorCursor.Location = NPC[A].Location;
@@ -439,6 +443,7 @@ void UpdateEditor()
                             EditorCursor.Location.Y = NPC[A].Location.Y;
                             SetCursor();
 //                            Netplay::sendData Netplay::EraseNPC(A, 1) + "p23" + LB;
+                            NPC[A].DefaultType = NPCID_NULL;
                             KillNPC(A, 9);
                             editorScreen.FocusNPC();
                             MouseRelease = false;
@@ -467,7 +472,7 @@ void UpdateEditor()
                                 if(n.id == 288 || n.id == 289 || (n.id == 91 && int(EditorCursor.NPC.Special) == 288))
                                     n.special_data = (long)EditorCursor.NPC.Special2;
 
-                                if(NPCIsAParaTroopa[n.id] || NPCIsCheep[n.id] || n.id == 260)
+                                if(NPCIsAParaTroopa(n.id) || NPCTraits[n.id].IsFish || n.id == 260)
                                     n.special_data = (long)EditorCursor.NPC.Special;
 
                                 if(n.id == 86)
@@ -601,8 +606,12 @@ void UpdateEditor()
 
                 if(MouseRelease) // BGOs
                 {
-                    for(A = numBackground; A >= 1; A--)
+                    // more difficult to iterate backwards, but that's what we need to do here
+                    auto sentinel = treeBackgroundQuery(EditorCursor.Location, SORTMODE_Z);
+                    for(auto i = sentinel.end(); i > sentinel.begin();)
                     {
+                        A = *(--i);
+
                         if(CursorCollision(EditorCursor.Location, Background[A].Location) && !Background[A].Hidden)
                         {
                             PlaySound(SFX_Grab);
@@ -646,10 +655,8 @@ void UpdateEditor()
                                 LevelBGO b;
                                 b.id = EditorCursor.Background.Type;
                                 b.layer = GetL(EditorCursor.Background.Layer);
-                                b.z_mode = EditorCursor.Background.zMode;
-                                b.z_offset = EditorCursor.Background.zOffset;
-                                if(EditorCursor.Background.zMode == LevelBGO::ZDefault)
-                                    b.smbx64_sp = EditorCursor.Background.SortPriority;
+                                b.z_mode = EditorCursor.Background.GetCustomLayer();
+                                b.z_offset = EditorCursor.Background.GetCustomOffset();
                                 IntProc::sendTakenBGO(b);
                             }
 #endif // THEXTECH_INTERPROC_SUPPORTED
@@ -825,11 +832,10 @@ void UpdateEditor()
                     // otherwise it would take a long time for the result vector
                     // to rejoin the pool. -- ds-sloth
                     auto sentinel = treeWorldSceneQuery(EditorCursor.Location, SORTMODE_ID);
-                    auto i = sentinel.end();
-                    --i;
-                    for(; i >= sentinel.begin(); i--)
+                    for(auto i = sentinel.end(); i > sentinel.begin();)
                     {
-                        A = (*i - &Scene[1]) + 1;
+                        A = *(--i);
+
                         if(CursorCollision(EditorCursor.Location, Scene[A].Location))
                         {
                             PlaySound(SFX_Grab);
@@ -968,7 +974,8 @@ void UpdateEditor()
                             else
                                 NPC[A].Location.SpeedX = -double(Physics.NPCShellSpeed / 2);
 //                            Netplay::sendData Netplay::EraseNPC(A, 0);
-                            if(NPCIsABonus[NPC[A].Type] || NPCIsACoin[NPC[A].Type])
+                            NPC[A].DefaultType = NPCID_NULL;
+                            if(NPC[A]->IsABonus || NPC[A]->IsACoin)
                                 KillNPC(A, 4); // Kill the bonus/coin
                             else
                                 KillNPC(A, 2); // Kill the NPC
@@ -1046,8 +1053,12 @@ void UpdateEditor()
                     && (EditorCursor.SubMode == -1 || EditorCursor.SubMode == 0
                         || EditorCursor.SubMode == OptCursor_t::LVL_BGOS))
                 {
-                    for(A = numBackground; A >= 1; A--)
+                    // more difficult to iterate backwards, but that's what we need to do here
+                    auto sentinel = treeBackgroundQuery(EditorCursor.Location, SORTMODE_Z);
+                    for(auto i = sentinel.end(); i > sentinel.begin();)
                     {
+                        A = *(--i);
+
                         if(CursorCollision(EditorCursor.Location, Background[A].Location) && !Background[A].Hidden)
                         {
 //                            Netplay::sendData Netplay::EraseBackground(A, 0);
@@ -1229,11 +1240,10 @@ void UpdateEditor()
                 {
                     // more difficult to iterate backwards, but that's what we need to do here
                     auto sentinel = treeWorldSceneQuery(EditorCursor.Location, SORTMODE_ID);
-                    auto i = sentinel.end();
-                    --i;
-                    for(; i >= sentinel.begin(); i--)
+                    for(auto i = sentinel.end(); i > sentinel.begin();)
                     {
-                        A = (*i - &Scene[1]) + 1;
+                        A = *(--i);
+
                         if(CursorCollision(EditorCursor.Location, Scene[A].Location))
                         {
                             tempLocation = static_cast<Location_t>(Scene[A].Location);
@@ -1528,7 +1538,6 @@ void UpdateEditor()
                     if(numBackground < maxBackgrounds) // Not out of backgrounds
                     {
                         numBackground++;
-                        EditorCursor.Background.uid = numBackground;
                         Background[numBackground] = EditorCursor.Background;
                         syncLayers_BGO(numBackground);
 
@@ -1571,7 +1580,7 @@ void UpdateEditor()
                         {
                             if((EditorCursor.NPC.Type != 208 && NPC[A].Type != NPCID_BOSS_CASE) || (EditorCursor.NPC.Type == 208 && NPC[A].Type == NPCID_BOSS_CASE))
                             {
-                                if(!NPCIsAVine[NPC[A].Type])
+                                if(!NPC[A]->IsAVine)
                                 {
                                     CanPlace = false;
                                     break;
@@ -2040,12 +2049,7 @@ void UpdateInterprocess()
             EditorCursor.Location.X = b.x;
             EditorCursor.Location.Y = b.y;
             EditorCursor.Background.Layer = FindLayer(b.layer);
-            EditorCursor.Background.SortPriority = -1;
-            EditorCursor.Background.uid = (numBackground + 1);
-            EditorCursor.Background.zMode = b.z_mode;
-            EditorCursor.Background.zOffset = b.z_offset;
-
-            bgoApplyZMode(&EditorCursor.Background, int(b.smbx64_sp));
+            EditorCursor.Background.SetSortPriority(b.z_mode, std::round(b.z_offset));
 
             if(EditorCursor.Background.Type > maxBackgroundType) // Avoid out of range crash
                 EditorCursor.Background.Type = 1;
@@ -2070,16 +2074,16 @@ void UpdateInterprocess()
 
             EditorCursor.Mode = OptCursor_t::LVL_NPCS;
             EditorCursor.NPC = NPC_t();
-            EditorCursor.NPC.Type = int(n.id);
+            EditorCursor.NPC.Type = NPCID(n.id);
             EditorCursor.NPC.Hidden = false;
             EditorCursor.Location.X = n.x;
             EditorCursor.Location.Y = n.y;
             EditorCursor.NPC.Direction = n.direct;
 
-            if(EditorCursor.NPC.Type > maxNPCType) // Avoid out of range crash
-                EditorCursor.NPC.Type = 1;
+            if(n.id > maxNPCType) // Avoid out of range crash
+                EditorCursor.NPC.Type = NPCID(1);
 
-            if(EditorCursor.NPC.Type == 91 || EditorCursor.NPC.Type == 96 || EditorCursor.NPC.Type == 283 || EditorCursor.NPC.Type == 284)
+            if(EditorCursor.NPC.Type == NPCID_ITEM_BURIED || EditorCursor.NPC.Type == NPCID_ITEM_POD || EditorCursor.NPC.Type == NPCID_ITEM_THROWER || EditorCursor.NPC.Type == NPCID_ITEM_BUBBLE)
             {
                 EditorCursor.NPC.Special = n.contents;
                 EditorCursor.NPC.DefaultSpecial = int(EditorCursor.NPC.Special);
@@ -2090,13 +2094,13 @@ void UpdateInterprocess()
                 EditorCursor.NPC.DefaultSpecial2 = int(EditorCursor.NPC.Special2);
             }
 
-            if(NPCIsAParaTroopa[EditorCursor.NPC.Type])
+            if(NPCIsAParaTroopa(EditorCursor.NPC))
             {
                 EditorCursor.NPC.Special = n.special_data;
                 EditorCursor.NPC.DefaultSpecial = int(EditorCursor.NPC.Special);
             }
 
-            if(NPCIsCheep[EditorCursor.NPC.Type])
+            if(EditorCursor.NPC->IsFish)
             {
                 EditorCursor.NPC.Special = n.special_data;
                 EditorCursor.NPC.DefaultSpecial = int(EditorCursor.NPC.Special);
@@ -2143,8 +2147,8 @@ void UpdateInterprocess()
             EditorCursor.NPC.AttLayer = FindLayer(n.attach_layer);
 
             EditorCursor.NPC.DefaultType = EditorCursor.NPC.Type;
-            EditorCursor.NPC.Location.Width = NPCWidth[EditorCursor.NPC.Type];
-            EditorCursor.NPC.Location.Height = NPCHeight[EditorCursor.NPC.Type];
+            EditorCursor.NPC.Location.Width = EditorCursor.NPC->TWidth;
+            EditorCursor.NPC.Location.Height = EditorCursor.NPC->THeight;
             EditorCursor.NPC.DefaultLocation = EditorCursor.NPC.Location;
             EditorCursor.NPC.DefaultDirection = EditorCursor.NPC.Direction;
             EditorCursor.NPC.TimeLeft = 1;
@@ -2163,13 +2167,13 @@ void UpdateInterprocess()
 }
 #endif // THEXTECH_INTERPROC_SUPPORTED
 
-int EditorNPCFrame(const int A, int C, int N)
+int EditorNPCFrame(const NPCID A, int C, int N)
 {
     float C_ = C;
     return EditorNPCFrame(A, C_, N);
 }
 
-int EditorNPCFrame(const int A, float& C, int N)
+int EditorNPCFrame(const NPCID A, float& C, int N)
 {
     int ret = 0;
 // find the default left/right frames for NPCs
@@ -2234,7 +2238,7 @@ int EditorNPCFrame(const int A, float& C, int N)
 
     // Bullet Bills
     if(A == 17 || A == 18 || A == 29 || A == 31 || A == 84 || A == 94 || A == 198 ||
-       NPCIsYoshi[A] || A == 101 || A == 102 || A == 181 || A == 81)
+       NPCIsYoshi(A) || A == 101 || A == 102 || A == 181 || A == 81)
     {
         if(int(B) == -1)
             ret = 0;
@@ -2397,31 +2401,32 @@ void GetEditorControls()
         PlaySound(SFX_Pause);
     }
 
+#if 0
     if(g_config.editor_edge_scroll && !editorScreen.active && !MagicHand) // scroll-by-edge
     {
         bool scrolled = false;
         int scroll_margin = EditorControls.FastScroll ? 16 : 32;
-        if(SharedCursor.X < 4 && SharedCursor.Y >= 0 && SharedCursor.Y < ScreenH)
+        if(SharedCursor.X < 4 && SharedCursor.Y >= 0 && SharedCursor.Y < XRender::TargetH)
         {
             SharedCursor.X += scroll_margin;
             EditorControls.ScrollLeft += scroll_margin;
             scrolled = true;
         }
-        if(SharedCursor.X >= ScreenW - 4 && SharedCursor.Y >= 0 && SharedCursor.Y < ScreenH)
+        if(SharedCursor.X >= XRender::TargetW - 4 && SharedCursor.Y >= 0 && SharedCursor.Y < XRender::TargetH)
         {
             SharedCursor.X -= scroll_margin;
             EditorControls.ScrollRight += scroll_margin;
             scrolled = true;
         }
 
-        if(SharedCursor.Y < 4 && SharedCursor.X >= 0 && SharedCursor.X < ScreenW)
+        if(SharedCursor.Y < 4 && SharedCursor.X >= 0 && SharedCursor.X < XRender::TargetW)
         {
             SharedCursor.Y += scroll_margin;
             EditorControls.ScrollUp += scroll_margin;
             scrolled = true;
         }
 
-        if(SharedCursor.Y >= ScreenH - 4 && SharedCursor.X >= 0 && SharedCursor.X < ScreenW)
+        if(SharedCursor.Y >= XRender::TargetH - 4 && SharedCursor.X >= 0 && SharedCursor.X < XRender::TargetW)
         {
             SharedCursor.Y -= scroll_margin;
             EditorControls.ScrollDown += scroll_margin;
@@ -2435,6 +2440,7 @@ void GetEditorControls()
             XWindow::placeCursor(window_x, window_y);
         }
     }
+#endif
 
     if(EditorControls.ScrollDown || EditorControls.ScrollUp || EditorControls.ScrollLeft || EditorControls.ScrollRight)
     {
@@ -2592,7 +2598,7 @@ void SetCursor()
         // Container NPCs are handled elsewhere in new editor
         if(MagicHand)
         {
-            if(t != 91 && t != 96 && t != 283 && t != 284 && !NPCIsCheep[t] && !NPCIsAParaTroopa[t] && t != NPCID_FIRE_CHAIN)
+            if(t != 91 && t != 96 && t != 283 && t != 284 && !NPCTraits[t].IsFish && !NPCIsAParaTroopa(t) && t != NPCID_FIRE_CHAIN)
                 EditorCursor.NPC.Special = 0;
             if(t != 288 && t != 289 && t != 91 && t != 260)
                 EditorCursor.NPC.Special2 = 0.0;
@@ -2604,12 +2610,12 @@ void SetCursor()
         EditorCursor.NPC.Layer = EditorCursor.Layer;
         EditorCursor.NPC.Location = EditorCursor.Location;
 
-        if(NPCWidth[EditorCursor.NPC.Type] > 0)
-            EditorCursor.NPC.Location.Width = NPCWidth[EditorCursor.NPC.Type];
+        if(EditorCursor.NPC->TWidth > 0)
+            EditorCursor.NPC.Location.Width = EditorCursor.NPC->TWidth;
         else
             EditorCursor.NPC.Location.Width = 32;
-        if(NPCHeight[EditorCursor.NPC.Type] > 0)
-            EditorCursor.NPC.Location.Height = NPCHeight[EditorCursor.NPC.Type];
+        if(EditorCursor.NPC->THeight > 0)
+            EditorCursor.NPC.Location.Height = EditorCursor.NPC->THeight;
         else
             EditorCursor.NPC.Location.Height = 32;
         EditorCursor.Location.Width = EditorCursor.NPC.Location.Width;
@@ -2865,7 +2871,7 @@ void PositionCursor()
 
     if(EditorCursor.Mode == 4)
     {
-        if(NPCHeight[EditorCursor.NPC.Type] < 32)
+        if(EditorCursor.NPC->THeight < 32)
             EditorCursor.Location.Y += 32;
     }
 }
@@ -2940,6 +2946,7 @@ void zTestLevel(bool magicHand, bool interProcess)
     Score = 0;
     Coins = 0;
     Lives = 3;
+    g_100s = 3;
 
     if(numPlayers == 0)
         numPlayers = editorScreen.num_test_players;
@@ -2955,7 +2962,7 @@ void zTestLevel(bool magicHand, bool interProcess)
             {
                 Player[A].Hearts = 0;
                 Player[A].State = testPlayer[1].State;
-                Player[A].HeldBonus = 0;
+                Player[A].HeldBonus = NPCID_NULL;
                 Player[A].Dead = false;
                 Player[A].Mount = testPlayer[1].Mount;
                 Player[A].MountType = testPlayer[1].MountType;
@@ -2970,7 +2977,7 @@ void zTestLevel(bool magicHand, bool interProcess)
             for(A = 2; A >= 1; A--)
             {
                 Player[A].State = testPlayer[A].State;
-                Player[A].HeldBonus = 0;
+                Player[A].HeldBonus = NPCID_NULL;
                 Player[A].Dead = false;
                 Player[A].Mount = testPlayer[A].Mount;
                 Player[A].MountType = testPlayer[A].MountType;
@@ -2986,9 +2993,13 @@ void zTestLevel(bool magicHand, bool interProcess)
     }
 
     LevelEditor = false;
+    TestLevel = true;
     SetupPlayers();
     MagicHand = magicHand;
     FontManager::clearAllCustomFonts();
+
+    // this clears the cached medals and stars data from the level
+    LevelWarpSaveEntries.clear();
 
     if(TestFullscreen)
     {
@@ -3007,7 +3018,6 @@ void zTestLevel(bool magicHand, bool interProcess)
         for(int i = 1; i <= maxLocalPlayers; i++)
             Player[i].Location.X = -20000.0;
 
-        TestLevel = true;
         LevelBeatCode = -3;
         QuickReconnectScreen::g_active = true;
         PauseGame(PauseCode::PauseScreen);
@@ -3088,7 +3098,6 @@ void zTestLevel(bool magicHand, bool interProcess)
     GameThing(waitms, 0);
 
     SetupScreens();
-    TestLevel = true;
     LevelSelect = false;
     EndLevel = false;
     editorScreen.active = false;
@@ -3112,13 +3121,13 @@ void MouseMove(float X, float Y, bool /*nCur*/)
         A = SingleCoop;
     else if(l_screen->Type == 5 && vScreen[2].Visible)
     {
-        if(X < float(vScreen[2].ScreenLeft + vScreen[2].Width))
+        if(X < float(vScreen[2].TargetX() + vScreen[2].Width))
         {
-            if(X > float(vScreen[2].ScreenLeft))
+            if(X > float(vScreen[2].TargetX()))
             {
-                if(Y < float(vScreen[2].ScreenTop + vScreen[2].Height))
+                if(Y < float(vScreen[2].TargetY() + vScreen[2].Height))
                 {
-                    if(Y > float(vScreen[2].ScreenTop))
+                    if(Y > float(vScreen[2].TargetY()))
                         A = 2;
                 }
             }
@@ -3127,8 +3136,8 @@ void MouseMove(float X, float Y, bool /*nCur*/)
     else
         A = 1;
 
-    X -= vScreen[A].ScreenLeft;
-    Y -= vScreen[A].ScreenTop;
+    X -= vScreen[A].TargetX();
+    Y -= vScreen[A].TargetY();
 
     // translate into layer coordinates to snap to layer's grid
     if(MagicHand && EditorCursor.Layer != LAYER_NONE)
@@ -3244,7 +3253,7 @@ void MouseMove(float X, float Y, bool /*nCur*/)
     }
 }
 
-void ResetNPC(int A)
+void ResetNPC(NPCID A)
 {
     NPC_t blankNPC;
     NPC[0] = blankNPC;

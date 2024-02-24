@@ -245,7 +245,7 @@ void Init(int plr, bool LegacyPause)
             s_items.push_back(MenuItem{g_gameStrings.pauseItemResetCheckpoints, s_ResetCheckpoints});
 
         if(g_compatibility.allow_drop_add)
-            s_items.push_back(MenuItem{g_gameStrings.pauseItemDropAddPlayers, s_DropAddScreen});
+            s_items.push_back(MenuItem{g_gameStrings.pauseItemPlayerSetup, s_DropAddScreen});
 
         if(!inter_screen && s_cheat_menu_bits == 14 && !BattleMode)
             s_items.push_back(MenuItem{g_gameStrings.pauseItemEnterCode, s_CheatScreen});
@@ -258,7 +258,7 @@ void Init(int plr, bool LegacyPause)
         s_items.push_back(MenuItem{g_gameStrings.pauseItemContinue, s_Continue});
 
         if(g_compatibility.allow_drop_add && s_pause_type != PauseType::Legacy)
-            s_items.push_back(MenuItem{g_gameStrings.pauseItemDropAddPlayers, s_DropAddScreen});
+            s_items.push_back(MenuItem{g_gameStrings.pauseItemPlayerSetup, s_DropAddScreen});
 
         if(s_cheat_menu_bits == 14 && s_pause_type != PauseType::Legacy && !BattleMode)
             s_items.push_back(MenuItem{g_gameStrings.pauseItemEnterCode, s_CheatScreen});
@@ -317,22 +317,22 @@ void Render()
     if(menu_box_width - total_menu_width < 32)
         menu_box_width = total_menu_width + 32;
 
-    int menu_left_X = ScreenW / 2 - total_menu_width / 2 + 20;
-    int menu_top_Y = ScreenH / 2 - total_menu_height / 2;
+    int menu_left_X = XRender::TargetW / 2 - total_menu_width / 2 + 20;
+    int menu_top_Y = XRender::TargetH / 2 - total_menu_height / 2;
 
     switch(s_pause_type)
     {
     case(PauseType::Legacy):
-        XRender::renderRect(ScreenW / 2 - menu_box_width / 2, ScreenH / 2 - menu_box_height / 2, menu_box_width, menu_box_height, {0, 0, 0});
+        XRender::renderRect(XRender::TargetW / 2 - menu_box_width / 2, XRender::TargetH / 2 - menu_box_height / 2, menu_box_width, menu_box_height, {0, 0, 0});
         break;
     case(PauseType::Modern):
     default:
-        XRender::renderRect(ScreenW / 2 - menu_box_width / 2 - 4, ScreenH / 2 - menu_box_height / 2 - 4, menu_box_width + 8, menu_box_height + 8, {0, 0, 0});
-        XRender::renderRect(ScreenW / 2 - menu_box_width / 2 - 2, ScreenH / 2 - menu_box_height / 2 - 2, menu_box_width + 4, menu_box_height + 4, {255, 255, 255});
-        XRender::renderRect(ScreenW / 2 - menu_box_width / 2, ScreenH / 2 - menu_box_height / 2, menu_box_width, menu_box_height, {0, 0, 0});
+        XRender::renderRect(XRender::TargetW / 2 - menu_box_width / 2 - 4, XRender::TargetH / 2 - menu_box_height / 2 - 4, menu_box_width + 8, menu_box_height + 8, {0, 0, 0});
+        XRender::renderRect(XRender::TargetW / 2 - menu_box_width / 2 - 2, XRender::TargetH / 2 - menu_box_height / 2 - 2, menu_box_width + 4, menu_box_height + 4, {255, 255, 255});
+        XRender::renderRect(XRender::TargetW / 2 - menu_box_width / 2, XRender::TargetH / 2 - menu_box_height / 2, menu_box_width, menu_box_height, {0, 0, 0});
         break;
     case(PauseType::Testing):
-        XRender::renderRect(ScreenW / 2 - menu_box_width / 2, ScreenH / 2 - menu_box_height / 2, menu_box_width, menu_box_height, {0, 0, 0, 127});
+        XRender::renderRect(XRender::TargetW / 2 - menu_box_width / 2, XRender::TargetH / 2 - menu_box_height / 2, menu_box_width, menu_box_height, {0, 0, 0, 127});
         break;
     }
 

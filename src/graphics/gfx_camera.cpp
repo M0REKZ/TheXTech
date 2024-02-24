@@ -68,6 +68,9 @@ void ProcessSmallScreenCam(vScreen_t& vscreen)
             lookX_target = -max_offsetX;
         lookX_target &= ~1;
 
+        if(LevelMacro != LEVELMACRO_OFF || ForcedControls)
+            lookX_target = 0;
+
         int16_t rateX = 1;
         // switching directions
         if((vscreen.small_screen_features.offset_x < 0 && lookX_target > 0)
@@ -81,7 +84,7 @@ void ProcessSmallScreenCam(vScreen_t& vscreen)
             rateX = 2;
         }
 
-        if(GamePaused == PauseCode::None && !qScreen && !ForcedControls)
+        if(GamePaused == PauseCode::None && !qScreen)
         {
             if(vscreen.small_screen_features.offset_x < lookX_target)
                 vscreen.small_screen_features.offset_x += rateX;
@@ -115,7 +118,7 @@ void ProcessSmallScreenCam(vScreen_t& vscreen)
                 vscreen.small_screen_features.offset_y *= -1;
         }
 
-        if(GamePaused == PauseCode::None && !qScreen && !ForcedControls)
+        if(GamePaused == PauseCode::None && !qScreen && !ForcedControls && LevelMacro == LEVELMACRO_OFF)
         {
             if(vscreen.small_screen_features.offset_y < lookY_target)
             {
@@ -135,17 +138,17 @@ void ProcessSmallScreenCam(vScreen_t& vscreen)
             if(vscreen.small_screen_features.offset_y_hold == 0 && vscreen.small_screen_features.offset_y < -max_offsetY + 40 && (vscreen.small_screen_features.last_buttons_held & 1) == 0 && p.Controls.Down)
             {
                 vscreen.small_screen_features.offset_y_hold = -max_offsetY;
-                PlaySound(SFX_Camera);
+                PlaySoundSpatial(SFX_Camera, p.Location);
             }
             else if(vscreen.small_screen_features.offset_y_hold == 0 && vscreen.small_screen_features.offset_y > max_offsetY - 40 && (vscreen.small_screen_features.last_buttons_held & 2) == 0 && p.Controls.Up)
             {
                 vscreen.small_screen_features.offset_y_hold = max_offsetY;
-                PlaySound(SFX_Camera);
+                PlaySoundSpatial(SFX_Camera, p.Location);
             }
             else if(vscreen.small_screen_features.offset_y_hold != 0 && vscreen.small_screen_features.offset_y > -60 && vscreen.small_screen_features.offset_y < 60)
             {
                 vscreen.small_screen_features.offset_y_hold = 0;
-                PlaySound(SFX_Camera);
+                PlaySoundSpatial(SFX_Camera, p.Location);
             }
 
             vscreen.small_screen_features.last_buttons_held = (int8_t)p.Controls.Down | (int8_t)p.Controls.Up << 1;
@@ -178,6 +181,10 @@ void DrawSmallScreenCam(vScreen_t& vscreen)
     // don't overlap the controls display
     if(screen.Type == ScreenTypes::Dynamic && screen.vScreen(2).Visible && vscreen.Left > 0)
         CamY -= 24;
+
+    // stay in the safe zone
+    if(vscreen.ScreenLeft + vscreen.Width >= XRender::TargetW)
+        CamX -= XRender::TargetOverscanX;
 
     // scale the opacity by the current effectiveness of the camera features
     double rate = 1.0;

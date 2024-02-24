@@ -110,6 +110,9 @@ void initEditorStrings()
     g_editorStrings.wordHeight = "Height";
     g_editorStrings.wordWidth = "Width";
 
+    g_editorStrings.labelSortLayer = "Sort Layer:";
+    g_editorStrings.labelSortOffset = "Sort Offset:";
+
     g_editorStrings.phraseTextOf = "{0} Text";
     g_editorStrings.phraseSectionIndex = "Section {0}";
     g_editorStrings.phraseRadiusIndex = "Radius {0}";
@@ -301,10 +304,12 @@ void initEditorStrings()
 
     g_editorStrings.fileConvertFeatureNPCVariant = "An NPC uses a behavior variant.";
     g_editorStrings.fileConvertFeatureBlockForceSmashable = "A spin block uses legacy smash.";
+    g_editorStrings.fileConvertFeatureBgoOrder = "A BGO uses custom draw order.";
 
     g_editorStrings.fileConvertFeatureCustomWorldMusic = "Uses custom world music file.";
     g_editorStrings.fileConvertFeatureWorldStarDisplay = "Uses world setting for star display.";
     g_editorStrings.fileConvertFeatureLevelStarDisplay = "A level uses setting for star display.";
+    g_editorStrings.fileConvertFeatureWorldMapSections = "The world includes world map sections.";
 
     g_editorStrings.browserNewFile = "New file";
     g_editorStrings.browserSaveFile = "Save file";
