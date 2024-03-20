@@ -126,7 +126,8 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
 
     oldSpecial = b.Special;
 
-    if(b.ShakeY != 0 || b.ShakeY2 != 0 || b.ShakeY3 != 0) // if the block has just been hit, ignore
+    // if(b.ShakeY != 0 || b.ShakeY2 != 0 || b.ShakeY3 != 0) // if the block has just been hit, ignore
+    if(b.ShakeCounter != 0) // if the block has just been hit, ignore
     {
         if(b.RapidHit > 0 && IF_INRANGE(whatPlayer, 1, maxPlayers) && Player[whatPlayer].Character == 4)
             b.RapidHit = iRand(3) + 1;
@@ -375,8 +376,7 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
             bool blocked_above = false;
             const auto query_loc = newLoc(b.Location.X + 1, b.Location.Y - 31, 30, 30);
 
-            // use treeBlockQueryWithTemp because this code can be triggered during the period when NPC temp blocks are active
-            for(int B : treeBlockQueryWithTemp(query_loc, SORTMODE_NONE))
+            for(int B : treeBlockQuery(query_loc, SORTMODE_NONE))
             {
                 if(B != A && !Block[B].Hidden && !(BlockOnlyHitspot1[Block[B].Type] && !BlockIsSizable[Block[B].Type]))
                 {
@@ -589,8 +589,8 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
 
             CharStuff(numNPCs);
 
-            // note: minor SMBX64 bug, should be nn->TWidth
-            nn.Location.Width = NPCWidth(C);
+            // note: minor SMBX64 bugfix, should be nn->TWidth in case nn's type has changed
+            nn.Location.Width = (g_compatibility.fix_npc_emerge_size) ? nn->TWidth : NPCWidth(C);
 
             // bug from ancient 101 case
             if(is_ancient && C == NPCID_FODDER_S3)
@@ -742,13 +742,13 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
         nn.Active = true;
         nn.TimeLeft = 1;
         nn.Type = NPCID_COIN_S4;
-        nn.Block = 89;
+        nn.coinSwitchBlockType = 89;
         nn.Location = b.Location;
         nn.Location.Width = nn->TWidth;
         nn.Location.Height = nn->THeight;
         nn.Location.X += (b.Location.Width - nn.Location.Width) / 2.0;
         nn.Location.Y -= 0.01;
-        nn.DefaultLocation = nn.Location;
+        nn.DefaultLocation = static_cast<SpeedlessLocation_t>(nn.Location);
         nn.DefaultType = nn.Type;
         syncLayers_NPC(numNPCs);
         CheckSectionNPC(numNPCs);
@@ -759,14 +759,32 @@ void BlockHit(int A, bool HitDown, int whatPlayer)
         BlockHitHard(A);
 }
 
+enum BlockShakeProgram : uint8_t
+{
+    SHAKE_UPDOWN12_BEG = 16 + 0,
+    SHAKE_UPDOWN12_MID = 16 + 6,
+    SHAKE_UPDOWN12_END = 16 + 12,
+
+    SHAKE_DOWNUP12_BEG = 32 + 0,
+    SHAKE_DOWNUP12_MID = 32 + 6,
+    SHAKE_DOWNUP12_END = 32 + 12,
+
+    SHAKE_UPDOWN06_BEG = 48 + 0,
+    SHAKE_UPDOWN06_MID = 48 + 3,
+    SHAKE_UPDOWN06_END = 48 + 6,
+};
+
 void BlockShakeUp(int A)
 {
     if(Block[A].Hidden)
         return;
 
-    Block[A].ShakeY = -12; // Go up
-    Block[A].ShakeY2 = 12; // Come back down
-    Block[A].ShakeY3 = 0;
+    // Block[A].ShakeY = -12; // Go up
+    // Block[A].ShakeY2 = 12; // Come back down
+    // Block[A].ShakeY3 = 0;
+
+    Block[A].ShakeCounter = SHAKE_UPDOWN12_BEG;
+    Block[A].ShakeOffset = 0;
 
     if(A != iBlock[iBlocks])
     {
@@ -780,9 +798,13 @@ void BlockShakeUpPow(int A)
     if(Block[A].Hidden)
         return;
 
-    Block[A].ShakeY = -6; // Go up
-    Block[A].ShakeY2 = 6; // Come back down
-    Block[A].ShakeY3 = 0;
+    // Block[A].ShakeY = -6; // Go up
+    // Block[A].ShakeY2 = 6; // Come back down
+    // Block[A].ShakeY3 = 0;
+
+    Block[A].ShakeCounter = SHAKE_UPDOWN06_BEG;
+    Block[A].ShakeOffset = 0;
+
     if(A != iBlock[iBlocks])
     {
         iBlocks++;
@@ -795,9 +817,12 @@ void BlockShakeDown(int A)
     if(Block[A].Hidden)
         return;
 
-    Block[A].ShakeY = 12; // Go down
-    Block[A].ShakeY2 = -12; // Come back up
-    Block[A].ShakeY3 = 0;
+    // Block[A].ShakeY = 12; // Go down
+    // Block[A].ShakeY2 = -12; // Come back up
+    // Block[A].ShakeY3 = 0;
+
+    Block[A].ShakeCounter = SHAKE_DOWNUP12_BEG;
+    Block[A].ShakeOffset = 0;
 
     if(A != iBlock[iBlocks])
     {
@@ -1244,122 +1269,111 @@ void UpdateBlocks()
         // Update the shake effect
         if(ib.Hidden)
         {
-            ib.ShakeY = 0;
-            ib.ShakeY2 = 0;
-            ib.ShakeY3 = 0;
+            // ib.ShakeY = 0;
+            // ib.ShakeY2 = 0;
+            // ib.ShakeY3 = 0;
+
+            ib.ShakeCounter = 0;
+            ib.ShakeOffset = 0;
         }
 
+        // check modBlocks.bas for the old shake logic
+#if 0
         if(ib.ShakeY < 0) // Block Shake Up
-        {
-            ib.ShakeY += 2;
-            ib.ShakeY3 -= 2;
-
-            if(ib.ShakeY == 0)
-            {
-                if(ib.TriggerHit != EVENT_NONE)
-                {
-                    ProcEvent(ib.TriggerHit, 0);
-                }
-
-                if(ib.Type == 282)
-                    ib.Type = 283;
-                else if(ib.Type == 283)
-                    ib.Type = 282;
-                if(ib.Type == 90 && ib.Special == 0 && !ib.forceSmashable)
-                {
-                    ib.Hidden = true;
-                    invalidateDrawBlocks();
-                    NewEffect(EFFID_SPINBLOCK, ib.Location, 1, iBlock[A]);
-                    ib.ShakeY = 0;
-                    ib.ShakeY2 = 0;
-                    ib.ShakeY3 = 0;
-                }
-            }
-        }
         else if(ib.ShakeY > 0) // Block Shake Down
-        {
-            ib.ShakeY -= 2;
-            ib.ShakeY3 += 2;
+        else if(ib.ShakeY2 > 0) // Come back down
+        else if(ib.ShakeY2 < 0) // Go back up
+#endif
 
-            if(ib.ShakeY == 0)
+        if(ib.ShakeCounter != 0)
+        {
+            if(    (ib.ShakeCounter >= SHAKE_UPDOWN06_BEG && ib.ShakeCounter < SHAKE_UPDOWN06_MID)
+                || (ib.ShakeCounter >= SHAKE_UPDOWN12_BEG && ib.ShakeCounter < SHAKE_UPDOWN12_MID)
+                || (ib.ShakeCounter >= SHAKE_DOWNUP12_MID && ib.ShakeCounter < SHAKE_DOWNUP12_END))
+            {
+                ib.ShakeOffset -= 2;
+            }
+            else
+                ib.ShakeOffset += 2;
+
+            ib.ShakeCounter++;
+
+            // do hit events at the middle of the shake program
+            if(    ib.ShakeCounter == SHAKE_UPDOWN06_MID
+                || ib.ShakeCounter == SHAKE_UPDOWN12_MID
+                || ib.ShakeCounter == SHAKE_DOWNUP12_MID)
             {
                 if(ib.TriggerHit != EVENT_NONE)
                     ProcEvent(ib.TriggerHit, 0);
 
+                // on/off block
                 if(ib.Type == 282)
                     ib.Type = 283;
                 else if(ib.Type == 283)
                     ib.Type = 282;
 
-                if(ib.Type == 90)
+                // spin block
+                if(ib.Type == 90 && (ib.ShakeCounter == SHAKE_DOWNUP12_MID || ib.Special == 0) && !ib.forceSmashable)
                 {
                     ib.Hidden = true;
                     invalidateDrawBlocks();
                     NewEffect(EFFID_SPINBLOCK, ib.Location, 1, iBlock[A]);
-                    ib.ShakeY = 0;
-                    ib.ShakeY2 = 0;
-                    ib.ShakeY3 = 0;
+                    ib.ShakeCounter = 0;
+                    ib.ShakeOffset = 0;
                 }
             }
-        }
-        else if(ib.ShakeY2 > 0) // Come back down
-        {
-            ib.ShakeY2 -= 2;
-            ib.ShakeY3 += 2;
 
-            if(ib.RapidHit > 0 && ib.Special > 0 && ib.ShakeY3 == 0)
+            // finish the shake program
+            if(    ib.ShakeCounter == SHAKE_UPDOWN06_END
+                || ib.ShakeCounter == SHAKE_UPDOWN12_END
+                || ib.ShakeCounter == SHAKE_DOWNUP12_END)
             {
-                BlockHit(iBlock[A]);
-                ib.RapidHit -= 1;
+                SDL_assert(ib.ShakeOffset == 0);
+
+                if(ib.RapidHit > 0 && ib.Special > 0 && ib.ShakeCounter != SHAKE_DOWNUP12_END)
+                {
+                    ib.ShakeCounter = 0;
+
+                    BlockHit(iBlock[A]);
+                    ib.RapidHit -= 1;
+                }
+                else
+                    ib.ShakeCounter = 0;
             }
         }
-        else if(ib.ShakeY2 < 0) // Go back up
-        {
-            ib.ShakeY2 += 2;
-            ib.ShakeY3 -= 2;
-        }
 
-        if(ib.ShakeY3 != 0)
+        if(ib.ShakeOffset != 0)
         {
-            for(auto B = 1; B <= numNPCs; B++)
+            Location_t query_loc = ib.Location;
+            query_loc.Y += ib.ShakeOffset;
+
+            for(int B : treeNPCQuery(query_loc, SORTMODE_ID))
             {
-                if(NPC[B].Active)
+                if(NPC[B].Active && NPC[B].Killed == 0 && NPC[B].Effect == 0 && NPC[B].HoldingPlayer == 0 && (!NPC[B]->NoClipping || NPC[B]->IsACoin))
                 {
-                    if(NPC[B].Killed == 0 && NPC[B].Effect == 0 && NPC[B].HoldingPlayer == 0 && (!NPC[B]->NoClipping || NPC[B]->IsACoin))
+                    if(ib.ShakeOffset <= 0 || NPC[B]->IsACoin)
                     {
-                        if(ib.ShakeY3 <= 0 || NPC[B]->IsACoin)
+                        if(ShakeCollision(NPC[B].Location, ib))
                         {
-                            if(ShakeCollision(NPC[B].Location, ib.Location, ib.ShakeY3))
+                            if(iBlock[A] != NPC[B].tempBlock && ib.tempBlockNpcIdx != B)
                             {
-                                if(iBlock[A] != NPC[B].tempBlock)
-                                {
-                                    if(ib.IsReally != B)
-                                    {
-                                        if(!BlockIsSizable[ib.Type] && !BlockOnlyHitspot1[ib.Type])
-                                        {
-                                            NPCHit(B, 2, iBlock[A]);
-                                        }
-                                        else
-                                        {
-                                            if(ib.Location.Y + 1 >= NPC[B].Location.Y + NPC[B].Location.Height - 1)
-                                            {
-                                                NPCHit(B, 2, iBlock[A]);
-                                            }
-                                        }
-                                    }
-                                }
+                                if(!BlockIsSizable[ib.Type] && !BlockOnlyHitspot1[ib.Type])
+                                    NPCHit(B, 2, iBlock[A]);
+                                else if(ib.Location.Y + 1 >= NPC[B].Location.Y + NPC[B].Location.Height - 1)
+                                    NPCHit(B, 2, iBlock[A]);
                             }
                         }
                     }
                 }
             }
+
             for(auto B = 1; B <= numPlayers; B++)
             {
                 if(!Player[B].Dead)
                 {
                     if(Player[B].Effect == 0 && ib.Type != 55)
                     {
-                        if(ShakeCollision(Player[B].Location, ib.Location, ib.ShakeY3))
+                        if(ShakeCollision(Player[B].Location, ib))
                         {
                             if(!BlockIsSizable[ib.Type] && !BlockOnlyHitspot1[ib.Type])
                             {
@@ -1367,14 +1381,11 @@ void UpdateBlocks()
                                 Player[B].StandUp = true;
                                 PlaySoundSpatial(SFX_Stomp, Player[B].Location);
                             }
-                            else
+                            else if(ib.Location.Y + 1 >= Player[B].Location.Y + Player[B].Location.Height - 1)
                             {
-                                if(ib.Location.Y + 1 >= Player[B].Location.Y + Player[B].Location.Height - 1)
-                                {
-                                    Player[B].Location.SpeedY = double(Physics.PlayerJumpVelocity);
-                                    Player[B].StandUp = true;
-                                    PlaySoundSpatial(SFX_Stomp, Player[B].Location);
-                                }
+                                Player[B].Location.SpeedY = double(Physics.PlayerJumpVelocity);
+                                Player[B].StandUp = true;
+                                PlaySoundSpatial(SFX_Stomp, Player[B].Location);
                             }
                         }
                     }
@@ -1400,16 +1411,12 @@ void UpdateBlocks()
     for(auto A = iBlocks; A >= 1; A--)
     {
         auto &ib = Block[iBlock[A]];
-        if(ib.ShakeY == 0)
+
+        // if(ib.ShakeY1 == 0 && ib.ShakeY2 == 0 && ib.ShakeY3 == 0)
+        if(ib.ShakeCounter == 0)
         {
-            if(ib.ShakeY2 == 0)
-            {
-                if(ib.ShakeY3 == 0)
-                {
-                    iBlock[A] = iBlock[iBlocks];
-                    iBlocks -= 1;
-                }
-            }
+            iBlock[A] = iBlock[iBlocks];
+            iBlocks -= 1;
         }
     }
 
@@ -1452,7 +1459,7 @@ void PSwitch(bool enabled)
     {
         for(A = 1; A <= numNPCs; A++)
         {
-            bool transform = NPC[A]->IsACoin && NPC[A].Block == 0 && !NPC[A].Hidden && NPC[A].Special == 0.0;
+            bool transform = NPC[A]->IsACoin && NPC[A].coinSwitchBlockType == 0 && !NPC[A].Hidden && NPC[A].Special == 0.0;
 
             if(NPC[A].Type == NPCID_MEDAL && g_compatibility.fix_special_coin_switch)
                 transform = false;
@@ -1491,7 +1498,16 @@ void PSwitch(bool enabled)
                     nb.Location.SpeedY = 0;
                     nb.Special = 0;
                     nb.Kill = false;
-                    nb.NPC = NPC[A].Type;
+                    nb.coinSwitchNpcType = NPC[A].Type;
+
+                    if(g_compatibility.fix_switched_block_clipping)
+                    {
+                        nb.tempBlockNpcIdx = 0;
+                        nb.tempBlockNpcType = NPCID_NULL;
+                        nb.tempBlockVehiclePlr = 0;
+                        nb.tempBlockVehicleYOffset = 0;
+                    }
+
                     syncLayersTrees_Block(numBlock);
                 }
 
@@ -1509,7 +1525,7 @@ void PSwitch(bool enabled)
         // fill it with the PSwitch-affected blocks
         for(A = numBlock; A >= 1; A--)
         {
-            if(BlockPSwitch[Block[A].Type] && Block[A].Special == 0 && Block[A].NPC == 0 && !Block[A].Hidden)
+            if(BlockPSwitch[Block[A].Type] && Block[A].Special == 0 && Block[A].coinSwitchNpcType == 0 && !Block[A].Hidden)
             {
                 PSwitchBlocks.push_back(A);
             }
@@ -1554,7 +1570,7 @@ void PSwitch(bool enabled)
                     nn.Layer = Block[A].Layer;
                     nn.TriggerDeath = Block[A].TriggerDeath;
                     nn.TriggerLast = Block[A].TriggerLast;
-                    nn.Block = Block[A].Type;
+                    nn.coinSwitchBlockType = Block[A].Type;
                     nn.Hidden = false;
                     nn.Location = Block[A].Location;
                     nn.Location.SpeedX = 0;
@@ -1562,7 +1578,7 @@ void PSwitch(bool enabled)
                     nn.Location.Width = nn->TWidth;
                     nn.Location.Height = nn->THeight;
                     nn.Location.X += (Block[A].Location.Width - nn.Location.Width) / 2.0;
-                    nn.DefaultLocation = nn.Location;
+                    nn.DefaultLocation = static_cast<SpeedlessLocation_t>(nn.Location);
                     nn.DefaultType = nn.Type;
 
                     // WARNING: this is new logic from #167. Check in case of any inconsistencies after Coin Switch is activated.
@@ -1613,7 +1629,7 @@ void PSwitch(bool enabled)
     {
         for(A = 1; A <= numNPCs; A++)
         {
-            if(NPC[A].Block > 0)
+            if(NPC[A].coinSwitchBlockType > 0)
             {
                 if(numBlock < maxBlocks)
                 {
@@ -1624,7 +1640,7 @@ void PSwitch(bool enabled)
                     nb.TriggerLast = NPC[A].TriggerLast;
                     nb.Hidden = NPC[A].Hidden;
                     nb.Invis = false;
-                    nb.Type = NPC[A].Block;
+                    nb.Type = NPC[A].coinSwitchBlockType;
                     nb.Location = NPC[A].Location;
                     nb.Location.SpeedX = 0;
                     nb.Location.SpeedY = 0;
@@ -1633,6 +1649,16 @@ void PSwitch(bool enabled)
                     nb.Location.X += (NPC[A].Location.Width - nb.Location.Width) / 2.0;
                     nb.Special = 0;
                     nb.Kill = false;
+
+                    if(g_compatibility.fix_switched_block_clipping)
+                    {
+                        nb.coinSwitchNpcType = NPCID_NULL;
+                        nb.tempBlockNpcIdx = 0;
+                        nb.tempBlockNpcType = NPCID_NULL;
+                        nb.tempBlockVehiclePlr = 0;
+                        nb.tempBlockVehicleYOffset = 0;
+                    }
+
                     syncLayersTrees_Block(numBlock);
                 }
                 NPC[A].Killed = 9;
@@ -1650,7 +1676,7 @@ void PSwitch(bool enabled)
         // fill it with the PSwitch-affected blocks
         for(A = numBlock; A >= 1; A--)
         {
-            if(Block[A].NPC > 0 && !Block[A].Hidden)
+            if(Block[A].coinSwitchNpcType > 0 && !Block[A].Hidden)
             {
                 PSwitchBlocks.push_back(A);
             }
@@ -1684,14 +1710,14 @@ void PSwitch(bool enabled)
                     nn.Active = true;
                     nn.TimeLeft = 1;
                     nn.Hidden = Block[A].Hidden;
-                    nn.Type = Block[A].NPC;
+                    nn.Type = Block[A].coinSwitchNpcType;
                     nn.Location = Block[A].Location;
                     nn.Location.SpeedX = 0;
                     nn.Location.SpeedY = 0;
                     nn.Location.Width = nn->TWidth;
                     nn.Location.Height = nn->THeight;
                     nn.Location.X += (Block[A].Location.Width - nn.Location.Width) / 2.0;
-                    nn.DefaultLocation = nn.Location;
+                    nn.DefaultLocation = static_cast<SpeedlessLocation_t>(nn.Location);
                     nn.DefaultType = nn.Type;
 
                     // WARNING: this is new logic from #167. Check in case of any inconsistencies after Coin Switch is activated.
@@ -1825,7 +1851,7 @@ void PowBlock()
 
         for(; Z <= numScreens; Z++)
         {
-            int vscreen_Z = screen.vScreen_refs[Z - 1];
+            uint8_t vscreen_Z = screen.vScreen_refs[Z - 1];
             const vScreen_t& vscreen = vScreen[vscreen_Z];
             const Location_t query_loc = newLoc(-vscreen.X, -vscreen.Y, vscreen.Width, vscreen.Height);
 

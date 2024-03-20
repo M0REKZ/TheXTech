@@ -317,6 +317,31 @@ SDL_FORCE_INLINE void memToValue(short &target, double value, FIELDTYPE ftype)
     }
 }
 
+SDL_FORCE_INLINE void memToValue(uint8_t &target, double value, FIELDTYPE ftype)
+{
+    switch(ftype)
+    {
+    case FT_BYTE:
+        target = static_cast<uint8_t>(f2i_cast<uint8_t>(value));
+        break;
+    case FT_WORD:
+        target = static_cast<uint8_t>(static_cast<int16_t>(f2i_cast<uint16_t>(value)));
+        break;
+    case FT_DWORD:
+    case FT_DFLOAT:
+        target = static_cast<uint8_t>(value);
+        break;
+    case FT_FLOAT:
+        target = static_cast<uint8_t>(f2i_cast<float>(value));
+        break;
+//    case FT_DFLOAT: // United with FT_DWORD
+//        target = static_cast<int32_t>(value);
+//        break;
+    default: //Don't change
+        break;
+    }
+}
+
 SDL_FORCE_INLINE void memToValue(bool &target, double value, FIELDTYPE ftype)
 {
     UNUSED(ftype);
@@ -382,6 +407,24 @@ SDL_FORCE_INLINE double valueToMem(const int &source, FIELDTYPE ftype)
 }
 
 SDL_FORCE_INLINE double valueToMem(const short &source, FIELDTYPE ftype)
+{
+    switch(ftype)
+    {
+    case FT_BYTE:
+        return static_cast<double>(static_cast<uint8_t>(source));
+    case FT_WORD:
+        return static_cast<double>(static_cast<int16_t>(source));
+    default:
+    case FT_DWORD:
+        return static_cast<double>(source);
+    case FT_FLOAT:
+        return static_cast<double>(static_cast<float>(source));
+    case FT_DFLOAT:
+        return static_cast<double>(source);
+    }
+}
+
+SDL_FORCE_INLINE double valueToMem(const uint8_t &source, FIELDTYPE ftype)
 {
     switch(ftype)
     {
@@ -906,6 +949,7 @@ protected:
         VT_UNKNOWN = 0,
         VT_DOUBLE,
         VT_FLOAT,
+        VT_UINT8,
         VT_INT16,
         VT_INT32,
         VT_BOOL,
@@ -929,6 +973,8 @@ protected:
         double      T::* field_d = nullptr;
         //! Float-type field pointer
         float       T::* field_f = nullptr;
+        //! UInt8-type field pointer (note: used exclusively for i16s converted to u8s)
+        uint8_t     T::* field_u8 = nullptr;
         //! Int-type field pointer
         short       T::* field_i16 = nullptr;
         //! Int-type field pointer
@@ -945,6 +991,19 @@ protected:
     Value m_type[maxAddr];
     //! Byte map of addresses
     Value m_byte[maxAddr];
+
+    void insert(size_t address, uint8_t T::*field)
+    {
+        Value v;
+
+        // Normal field
+        v.field_u8 = field;
+        v.type = VT_UINT8;
+        v.baseType = VT_UINT8;
+        v.offset = 0; //-V1048
+        v.baseAddress = address;
+        m_type[address] = v;
+    }
 
     void insert(size_t address, short T::*field)
     {
@@ -1146,6 +1205,14 @@ public:
             return valueToMem(obj->*(t->field_i16), ftype);
         }
 
+        case VT_UINT8:
+        {
+            SDL_assert(t->field_u8);
+            if(ftype != FT_WORD)
+                pLogWarning("MemEmu: Read type missmatched at %s 0x%x (SInt16 expected, %s actually)", objName, address, FieldtypeToStr(ftype));
+            return valueToMem(obj->*(t->field_u8), ftype);
+        }
+
         case VT_BOOL:
         {
             SDL_assert(t->field_b);
@@ -1284,6 +1351,15 @@ public:
             return;
         }
 
+        case VT_UINT8:
+        {
+            SDL_assert(t->field_u8);
+            if(ftype != FT_WORD)
+                pLogWarning("MemEmu: Write type missmatched at %s 0x%x (SInt16 expected, %s actually)", objName, address, FieldtypeToStr(ftype));
+            memToValue(obj->*(t->field_u8), value, ftype);
+            return;
+        }
+
         case VT_BOOL:
         {
             SDL_assert(t->field_b);
@@ -1381,6 +1457,25 @@ public:
     }
 };
 
+static constexpr char speedless_location_t_name[] = "SpeedlessLocation_t";
+typedef SMBXObjectMemoryEmulator<SpeedlessLocation_t, speedless_location_t_name, 0x20> SpeedlessLocationParent;
+class SpeedlessLocationMemory final : public SpeedlessLocationParent
+{
+public:
+    SpeedlessLocationMemory() noexcept : SpeedlessLocationParent()
+    {
+        buildTable();
+    }
+
+    void buildTable()
+    {
+        insert(0x00, &SpeedlessLocation_t::X);
+        insert(0x08, &SpeedlessLocation_t::Y);
+        insert(0x10, &SpeedlessLocation_t::Height);
+        insert(0x18, &SpeedlessLocation_t::Width);
+    }
+};
+
 
 static constexpr char controls_t_name[] = "Controls_t";
 typedef SMBXObjectMemoryEmulator<Controls_t, controls_t_name, 0x16> ControlsParent;
@@ -1409,6 +1504,7 @@ public:
 
 static ControlsMemory s_conMem;
 static LocationMemory s_locMem;
+static SpeedlessLocationMemory s_spLocMem;
 
 
 static constexpr char playere_t_name[] = "Player_t";
@@ -1839,8 +1935,8 @@ public:
         // insert(0x00000056, &NPC_t::Pinched); // unused since SMBX64, now removed
         // insert(0x00000058, &NPC_t::PinchedDirection); // unused since SMBX64, now removed
         insert(0x0000005c, &NPC_t::BeltSpeed);
-        insert(0x00000060, &NPC_t::standingOnPlayer);
-        insert(0x00000062, &NPC_t::standingOnPlayerY);
+        insert(0x00000060, &NPC_t::vehiclePlr);
+        insert(0x00000062, &NPC_t::vehicleYOffset);
         insert(0x00000064, // Generator
             [](const NPC_t& n, FIELDTYPE ftype)->double
             {
@@ -1891,7 +1987,19 @@ public:
         );
         // insert(0x00000078, &NPC_t::Location); // between 0x78 and 0xA8
         // insert(0x000000a8, &NPC_t::DefaultLocation); // between 0xA8 and 0xD8
-        insert(0x000000d8, &NPC_t::DefaultDirection);
+        insert(0x000000d8, // DefaultDirection
+            [](const NPC_t& n, FIELDTYPE ftype)->double
+            {
+                return valueToMem((float)n.DefaultDirection, ftype);
+            },
+            [](NPC_t& n, double in, FIELDTYPE ftype)->void
+            {
+                float direction = 0.0;
+                memToValue(direction, in, ftype);
+
+                n.DefaultDirection = (int8_t)direction;
+            }
+        );
         static_assert(sizeof(NPC_t::DefaultType) == sizeof(vbint_t), "underlying type of NPC_t::DefaultType must be vbint_t");
         insert(0x000000dc, reinterpret_cast<vbint_t NPC_t::*>(&NPC_t::DefaultType));
         insert(0x000000de, &NPC_t::DefaultSpecial);
@@ -1998,7 +2106,7 @@ public:
                     NPCQueues::Active.erase(n);
             }
         );
-        insert(0x0000014e, &NPC_t::Block);
+        insert(0x0000014e, &NPC_t::coinSwitchBlockType);
         insert(0x00000150, &NPC_t::tempBlock);
         insert(0x00000152, // onWall
             [](const NPC_t& n, FIELDTYPE ftype)->double
@@ -2041,8 +2149,10 @@ public:
     {
         if(address >= 0x78 && address < 0xA8) // Location
             return s_locMem.getValue(&obj->Location, address - 0x78, ftype);
-        else if(address >= 0xA8 && address < 0xD8) // DefaultLocation
-            return s_locMem.getValue(&obj->DefaultLocation, address - 0xA8, ftype);
+        else if(address >= 0xC8 && address < 0xD8) // invalid part of DefaultLocation
+            pLogWarning("MemEmu: Attempt to read NPC address 0x%x (removed part of DefaultLocation)", address);
+        else if(address >= 0xA8 && address < 0xC8) // DefaultLocation
+            return s_spLocMem.getValue(&obj->DefaultLocation, address - 0xA8, ftype);
         else if(address == 0x126)
             return obj->Reset[1] ? 0xFFFF : 0;
         else if(address == 0x128)
@@ -2079,9 +2189,14 @@ public:
             treeNPCUpdate(obj);
             return;
         }
-        else if(address >= 0xA8 && address < 0xD8) // DefaultLocation
+        else if(address >= 0xC8 && address < 0xD8) // DefaultLocation, invalid part
         {
-            s_locMem.setValue(&obj->DefaultLocation, address - 0xA8, value, ftype);
+            pLogWarning("MemEmu: Attempt to set NPC address 0x%x (removed part of DefaultLocation)", address);
+            return;
+        }
+        else if(address >= 0xA8 && address < 0xC8) // DefaultLocation
+        {
+            s_spLocMem.setValue(&obj->DefaultLocation, address - 0xA8, value, ftype);
             return;
         }
         else if(address == 0x126)

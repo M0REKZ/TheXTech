@@ -41,6 +41,7 @@
 #include "../graphics.h"
 #include "../controls.h"
 #include "../script/msg_preprocessor.h"
+#include "script/luna/lunacounter.h"
 
 #include "npc_id.h"
 #include "npc_traits.h"
@@ -207,6 +208,9 @@ void UpdatePlayer()
         if(Player[A].TimeToLive > 0)
         {
             Player[A].TimeToLive += 1;
+
+            if(Player[A].TimeToLive == 50 && !g_ClonedPlayerMode)
+                gDeathCounter.MarkDeath();
 
             const Screen_t& screen = ScreenByPlayer(A);
             bool dynamic_screen = (screen.Type == ScreenTypes::Dynamic);
@@ -545,7 +549,7 @@ void UpdatePlayer()
                         // lBlock = LastBlock[((tempLocation.X + tempLocation.Width) / 32.0) + 1];
                         // blockTileGet(tempLocation, fBlock, lBlock);
 
-                        for(int B : treeBlockQuery(tempLocation, SORTMODE_NONE))
+                        for(int B : treeFLBlockQuery(tempLocation, SORTMODE_NONE))
                         {
                             if(!Block[B].Invis && !BlockIsSizable[Block[B].Type] && !BlockOnlyHitspot1[Block[B].Type] &&
                                !BlockNoClipping[Block[B].Type] && !Block[B].Hidden)
@@ -2186,14 +2190,24 @@ void UpdatePlayer()
 
                     if(offScreenExit)
                     {
+                        // Always quit to the world map by off-screen exit
+                        if(!NoMap && !FileRecentSubHubLevel.empty())
+                        {
+                            FileRecentSubHubLevel.clear();
+                            ReturnWarp = 0;
+                            ReturnWarpSaved = 0;
+                        }
+
                         LevelBeatCode = 3;
                         EndLevel = true;
                         LevelMacro = LEVELMACRO_OFF;
                         LevelMacroCounter = 0;
+
                         if(g_config.EnableInterLevelFade)
                             g_levelScreenFader.setupFader(4, 0, 65, ScreenFader::S_FADE);
                         else
                             g_levelScreenFader.setupFader(65, 0, 65, ScreenFader::S_FADE);
+
                         levelWaitForFade();
                     }
 
@@ -2327,8 +2341,12 @@ void UpdatePlayer()
                 // lBlock = LastBlock[((Player[A].Location.X + Player[A].Location.Width) / 32.0) + 1];
                 // blockTileGet(Player[A].Location, fBlock, lBlock);
 
-                for(int B : treeBlockQuery(Player[A].Location, SORTMODE_COMPAT))
+                UpdatableQuery<BlockRef_t> q(Player[A].Location, SORTMODE_COMPAT, QUERY_FLBLOCK);
+
+                for(auto it = q.begin(); it != q.end(); ++it)
                 {
+                    int B = *it;
+
                     // checks to see if a collision happened
                     if(Player[A].Location.X + Player[A].Location.Width >= Block[B].Location.X)
                     {
@@ -2410,12 +2428,14 @@ void UpdatePlayer()
                                                 HitSpot = 0;
                                         }
 
-                                        // fixes a bug with holding an npc that is really a block
+                                        // unclear that this does what Redigit thought; maybe it did with a previous version of the coin switch code
+
+                                        // ' fixes a bug with holding an npc that is really a block
                                         if(Player[A].HoldingNPC > 0)
                                         {
-                                            if(NPC[Player[A].HoldingNPC].Block > 0)
+                                            if(NPC[Player[A].HoldingNPC].coinSwitchBlockType > 0)
                                             {
-                                                if(NPC[Player[A].HoldingNPC].Block == B)
+                                                if(NPC[Player[A].HoldingNPC].coinSwitchBlockType == B)
                                                     HitSpot = 0;
                                             }
                                         }
@@ -2901,7 +2921,7 @@ void UpdatePlayer()
                                                 // lBlock = LastBlock[((tempLocation.X + tempLocation.Width) / 32.0) + 1];
                                                 // blockTileGet(tempLocation, fBlock, lBlock);
 
-                                                for(int C : treeBlockQuery(tempLocation, SORTMODE_COMPAT))
+                                                for(int C : treeFLBlockQuery(tempLocation, SORTMODE_COMPAT))
                                                 {
                                                     if(CheckCollision(tempLocation, Block[C].Location) && !Block[C].Hidden)
                                                     {
@@ -2934,6 +2954,8 @@ void UpdatePlayer()
                                                     Player[A].Location.Y += -Player[A].Location.SpeedY;
                                                     Player[A].Location.SpeedX = 0;
                                                     Player[A].Location.SpeedY = 0;
+
+                                                    q.update(Player[A].Location, it);
                                                 }
                                             }
                                         }
@@ -3423,9 +3445,9 @@ void UpdatePlayer()
                 {
                     if(NPC[B].Active && NPC[B].Killed == 0 && NPC[B].Effect != 5 && NPC[B].Effect != 6)
                     {
-                        // If Not (NPC(B).Type = 17 And NPC(B).CantHurt > 0) And Not (.Mount = 2 And NPC(B).Type = 56) And Not NPC(B).standingOnPlayer = A And Not NPC(B).Type = 197 And Not NPC(B).Type = 237 Then
+                        // If Not (NPC(B).Type = 17 And NPC(B).CantHurt > 0) And Not (.Mount = 2 And NPC(B).Type = 56) And Not NPC(B).vehiclePlr = A And Not NPC(B).Type = 197 And Not NPC(B).Type = 237 Then
                         if(!(Player[A].Mount == 2 && NPC[B].Type == NPCID_VEHICLE) &&
-                            NPC[B].standingOnPlayer != A &&
+                            NPC[B].vehiclePlr != A &&
                             NPC[B].Type != NPCID_GOALTAPE &&
                             NPC[B].Type != NPCID_ICE_BLOCK
                         )
@@ -3654,7 +3676,7 @@ void UpdatePlayer()
                                     }
                                     else if(Player[A].Mount == 2)
                                     {
-                                        if(NPC[B].standingOnPlayer == A)
+                                        if(NPC[B].vehiclePlr == A)
                                             HitSpot = 0;
                                         else if(!(NPC[B].Type == NPCID_BULLET && NPC[B].CantHurt > 0))
                                         {
@@ -4150,7 +4172,7 @@ void UpdatePlayer()
                                                     // lBlock = LastBlock[((Player[A].Location.X + Player[A].Location.Width) / 32.0) + 1];
                                                     // blockTileGet(Player[A].Location, fBlock, lBlock);
 
-                                                    for(int C : treeBlockQuery(Player[A].Location, SORTMODE_NONE))
+                                                    for(int C : treeFLBlockQuery(Player[A].Location, SORTMODE_NONE))
                                                     {
                                                         if(CheckCollision(Player[A].Location, Block[C].Location) &&
                                                            !Block[C].Hidden && !BlockIsSizable[Block[C].Type] &&
@@ -4257,17 +4279,20 @@ void UpdatePlayer()
                                                                 tempBlockHit[2] = 0;
                                                         }
                                                     }
+
                                                     if(Player[A].Mount == 2)
                                                     {
                                                         D = Player[A].Location.X - D;
-                                                        for(int C = 1; C <= numNPCs; C++)
+
+                                                        for(int C : NPCQueues::Active.no_change)
                                                         {
-                                                            if(NPC[C].standingOnPlayer == A)
+                                                            if(NPC[C].vehiclePlr == A)
                                                             {
                                                                 NPC[C].Location.X += D;
                                                                 treeNPCUpdate(C);
                                                             }
                                                         }
+
                                                         for(int C = 1; C <= numPlayers; C++)
                                                         {
                                                             if(Player[C].StandingOnTempNPC == 56)

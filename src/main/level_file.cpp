@@ -21,9 +21,8 @@
 #include "sdl_proxy/sdl_stdinc.h"
 #include "sdl_proxy/sdl_timer.h"
 
-#ifdef THEXTECH_BUILD_GL_MODERN
 #include <json/json.hpp>
-#endif
+#include <algorithm>
 
 #ifdef __16M__
 // used to clear loaded textures on level/world load
@@ -199,9 +198,25 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
 
     IsEpisodeIntro = (StartLevel == FileNameFull);
 
-    FileFormats::smbx64LevelPrepare(lvl);
-    FileFormats::smbx64LevelSortBlocks(lvl);
-    FileFormats::smbx64LevelSortBGOs(lvl);
+    if(IsEpisodeIntro)
+    {
+        IsHubLevel = NoMap;
+        FileRecentSubHubLevel.clear();
+    }
+
+    if(!IsHubLevel)
+    {
+        IsHubLevel = std::find(SubHubLevels.begin(), SubHubLevels.end(), FileNameFull) != SubHubLevels.end();
+
+        if(IsHubLevel)
+            FileRecentSubHubLevel = FileNameFull;
+    }
+
+    // Level-wide extra settings
+    if(!lvl.custom_params.empty())
+    {
+        // none supported yet
+    }
 
     numBlock = 0;
     numBackground = 0;
@@ -235,6 +250,7 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
 
     g_curLevelMedals.prepare_lvl(lvl);
 
+    // Level-wide settings
     maxStars = lvl.stars;
     LevelName = lvl.LevelName;
 
@@ -768,7 +784,7 @@ bool OpenLevelData(LevelData &lvl, const std::string FilePath)
         npc.DefaultType = npc.Type;
         npc.Location.Width = npc->TWidth;
         npc.Location.Height = npc->THeight;
-        npc.DefaultLocation = npc.Location;
+        npc.DefaultLocation = static_cast<SpeedlessLocation_t>(npc.Location);
         npc.DefaultDirection = npc.Direction;
 
         // allow every NPC to be active for one frame to initialize its internal state
@@ -1068,6 +1084,7 @@ void ClearLevel()
     NPCTraits[NPCID_MEDAL].Score = 6;
     RestoreWorldStrings();
     LevelName.clear();
+    IsHubLevel = false;
     ResetCompat();
     SetupPhysics();
     LoadNPCDefaults();
@@ -1345,6 +1362,7 @@ void FindStars()
     }
 }
 
+#if 0
 // Is there any unsupported content for this format in the level?
 bool CanConvertLevel(int format, std::string* reasons)
 {
@@ -1618,3 +1636,4 @@ void ConvertLevel(int format)
     for(int i = 1; i <= numBlock; i++)
         Block[i].forceSmashable = 0;
 }
+#endif

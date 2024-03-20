@@ -250,7 +250,7 @@ public:
                 (
                   (
                     (NPC[A].HoldingPlayer > 0 && Player[NPC[A].HoldingPlayer].Effect != 3) ||
-                    (NPC[A].Type == NPCID_TOOTHY && NPC[A].standingOnPlayer == 0) ||
+                    (NPC[A].Type == NPCID_TOOTHY && NPC[A].vehiclePlr == 0) ||
                     (NPC[A].Type == NPCID_BULLET && NPC[A].CantHurt > 0)
                   ) || NPC[A].Effect == NPCEFF_PET_TONGUE
                 ) && NPC[A].Type != NPCID_ITEM_BURIED && !Player[NPC[A].HoldingPlayer].Dead
@@ -279,7 +279,7 @@ public:
             g_stats.renderedNPCs += 1;
         }
         else if(NPC[A].Effect == 0 && NPC[A].HoldingPlayer == 0 &&
-            (NPC[A].standingOnPlayer > 0 || NPC[A].Type == NPCID_VEHICLE || NPC[A].Type == NPCID_CANNONITEM ||
+            (NPC[A].vehiclePlr > 0 || NPC[A].Type == NPCID_VEHICLE || NPC[A].Type == NPCID_CANNONITEM ||
                 NPC[A].Type == NPCID_TOOTHYPIPE || NPC[A].Type == NPCID_ITEM_BURIED || NPC[A].Type == NPCID_ROCKET_WOOD ||
                 NPC[A].Type == NPCID_FIRE_BOSS_FIRE || NPC[A]->IsACoin))
         {
@@ -296,7 +296,7 @@ public:
                     NPC[A].Type == NPCID_LONG_PLANT_UP || NPC[A].Type == NPCID_LONG_PLANT_DOWN || NPC[A].Type == NPCID_BOTTOM_PLANT ||
                     NPC[A].Type == NPCID_SIDE_PLANT || NPC[A].Effect == NPCEFF_EMERGE_UP || NPC[A].Effect == NPCEFF_EMERGE_DOWN ||
                     NPC[A].Effect == NPCEFF_WARP || (NPC[A].Type == NPCID_SLIDE_BLOCK && NPC[A].Special == 0.0))
-                && NPC[A].standingOnPlayer == 0))
+                && NPC[A].vehiclePlr == 0))
         {
             if(BG_n == sizeof(BG) / sizeof(uint16_t))
                 return;
@@ -600,7 +600,7 @@ void s_UpdateDrawItems(Screen_t& screen, int i)
             vscreen.Height + i_drawBlocks_margin * 2);
 
         // make query (sort by ID as done in vanilla)
-        TreeResult_Sentinel<BlockRef_t> areaBlocks = treeBlockQuery(s_drawBlocks_bounds[i], SORTMODE_ID);
+        TreeResult_Sentinel<BlockRef_t> areaBlocks = treeFLBlockQuery(s_drawBlocks_bounds[i], SORTMODE_ID);
 
         // load query results into different sets of blocks
         s_drawSBlocks[i].clear();
@@ -840,7 +840,7 @@ void ClassicNPCScreenLogic(int Z, int numScreens, bool fill_draw_queue, NPC_Draw
              NPC[A].Type == NPCID_LONG_PLANT_UP || NPC[A].Type == NPCID_LONG_PLANT_DOWN || NPC[A].Type == NPCID_BOTTOM_PLANT ||
              NPC[A].Type == NPCID_SIDE_PLANT || NPC[A].Effect == NPCEFF_EMERGE_UP || NPC[A].Effect == NPCEFF_EMERGE_DOWN ||
              NPC[A].Effect == NPCEFF_WARP || (NPC[A].Type == NPCID_SLIDE_BLOCK && NPC[A].Special == 0.0)) &&
-             (NPC[A].standingOnPlayer == 0 && (!NPC[A].Generator || LevelEditor))) ||
+             (NPC[A].vehiclePlr == 0 && (!NPC[A].Generator || LevelEditor))) ||
              NPC[A].Type == NPCID_SAW || NPC[A].Type == NPCID_JUMP_PLANT)
         {
             if(NPC[A].Effect != NPCEFF_DROP_ITEM && (!NPC[A].Generator || LevelEditor))
@@ -849,7 +849,7 @@ void ClassicNPCScreenLogic(int Z, int numScreens, bool fill_draw_queue, NPC_Draw
             }
         }
 
-        if(NPC[A].Effect == 0 && ((NPC[A].HoldingPlayer == 0 && (NPC[A].standingOnPlayer > 0 || NPC[A].Type == NPCID_VEHICLE ||
+        if(NPC[A].Effect == 0 && ((NPC[A].HoldingPlayer == 0 && (NPC[A].vehiclePlr > 0 || NPC[A].Type == NPCID_VEHICLE ||
                                    NPC[A].Type == NPCID_CANNONITEM || NPC[A].Type == NPCID_TOOTHYPIPE || NPC[A].Type == NPCID_ITEM_BURIED || NPC[A].Type == NPCID_ROCKET_WOOD ||
                                    NPC[A].Type == NPCID_FIRE_BOSS_FIRE || NPC[A]->IsACoin) && (!NPC[A].Generator || LevelEditor))))
         {
@@ -879,7 +879,7 @@ void ClassicNPCScreenLogic(int Z, int numScreens, bool fill_draw_queue, NPC_Draw
                  NPC[A].Type == NPCID_JUMP_PLANT || NPC[A].Type == NPCID_ROCKET_WOOD || NPC[A].Type == NPCID_LIFT_SAND || NPC[A].Type == NPCID_PLANT_S3 || NPC[A].Type == NPCID_FIRE_PLANT ||
                  NPC[A].Type == NPCID_PLANT_S1 || NPC[A].Type == NPCID_BOTTOM_PLANT || NPC[A].Type == NPCID_SIDE_PLANT || NPC[A].Type == NPCID_BIG_PLANT || NPC[A].Type == NPCID_LONG_PLANT_UP ||
                  NPC[A].Type == NPCID_LONG_PLANT_DOWN || NPC[A].Type == NPCID_VEHICLE || NPC[A].Type == NPCID_CANNONITEM || NPC[A].Type == NPCID_TOOTHYPIPE || NPC[A].Type == NPCID_ITEM_BURIED) &&
-               !(NPC[A].Type == NPCID_SLIDE_BLOCK && NPC[A].Special == 0) && NPC[A].standingOnPlayer == 0 &&
+               !(NPC[A].Type == NPCID_SLIDE_BLOCK && NPC[A].Special == 0) && NPC[A].vehiclePlr == 0 &&
                !NPC[A]->Foreground && (!NPC[A].Generator || LevelEditor) &&
                NPC[A].Type != NPCID_SAW && NPC[A].Type != NPCID_ICE_CUBE)
             {
@@ -902,7 +902,7 @@ void ClassicNPCScreenLogic(int Z, int numScreens, bool fill_draw_queue, NPC_Draw
             (
               (
                 (NPC[A].HoldingPlayer > 0 && hp.Effect != 3 && !hp_door_scroll) ||
-                (NPC[A].Type == NPCID_TOOTHY && NPC[A].standingOnPlayer == 0) ||
+                (NPC[A].Type == NPCID_TOOTHY && NPC[A].vehiclePlr == 0) ||
                 (NPC[A].Type == NPCID_BULLET && NPC[A].CantHurt > 0)
               ) || NPC[A].Effect == NPCEFF_PET_TONGUE
             ) && NPC[A].Type != NPCID_ITEM_BURIED && !Player[NPC[A].HoldingPlayer].Dead
@@ -957,7 +957,7 @@ void ClassicNPCScreenLogic(int Z, int numScreens, bool fill_draw_queue, NPC_Draw
             if((NPC[A].Reset[Z] && (!check_both_reset || NPC[A].Reset[3 - Z])) || NPC[A].Active || (activate_conveyer && NPC[A].Type == NPCID_CONVEYOR))
             {
                 if(set_justactivated && !NPC[A].Active)
-                    NPC[A].JustActivated = Z;
+                    NPC[A].JustActivated = static_cast<uint8_t>(Z);
 
                 NPC[A].TimeLeft = Physics.NPCTimeOffScreen;
                 if(check_long_life && (NPCIsYoshi(NPC[A]) || NPCIsBoot(NPC[A]) || NPC[A].Type == NPCID_POWER_S3 || NPC[A].Type == NPCID_FIRE_POWER_S3 || NPC[A].Type == NPCID_CANNONITEM || NPC[A].Type == NPCID_LIFE_S3 || NPC[A].Type == NPCID_POISON || NPC[A].Type == NPCID_STATUE_POWER || NPC[A].Type == NPCID_HEAVY_POWER || NPC[A].Type == NPCID_FIRE_POWER_S1 || NPC[A].Type == NPCID_FIRE_POWER_S4 || NPC[A].Type == NPCID_POWER_S1 || NPC[A].Type == NPCID_POWER_S4 || NPC[A].Type == NPCID_LIFE_S1 || NPC[A].Type == NPCID_LIFE_S4 || NPC[A].Type == NPCID_3_LIFE || NPC[A].Type == NPCID_FLIPPED_RAINBOW_SHELL || NPC[A].Type == NPCID_PLATFORM_S3))
@@ -1099,7 +1099,7 @@ void ModernNPCScreenLogic(Screen_t& screen, int vscreen_i, bool fill_draw_queue,
 
         bool loc2_exists;
         if(NPC[A].Effect == 0 && NPC[A].HoldingPlayer == 0 && !NPC[A].Generator &&
-                (NPC[A].standingOnPlayer > 0 || NPC[A].Type == 56 || NPC[A].Type == 22
+                (NPC[A].vehiclePlr > 0 || NPC[A].Type == 56 || NPC[A].Type == 22
                     || NPC[A].Type == 49 || NPC[A].Type == 91 || NPC[A].Type == 160
                     || NPC[A].Type == 282 || NPC[A]->IsACoin || NPC[A].Type == 263))
         {
@@ -1264,7 +1264,7 @@ void ModernNPCScreenLogic(Screen_t& screen, int vscreen_i, bool fill_draw_queue,
             else if(!NPC[A].Active && NPC[A].Effect != 2
                 && ((NPC[A].Reset[1] && NPC[A].Reset[2]) || NPC[A].Type == NPCID_CONVEYOR))
             {
-                NPC[A].JustActivated = Z;
+                NPC[A].JustActivated = static_cast<uint8_t>(Z);
 
                 if(!NPC[A].Active)
                 {
@@ -1826,7 +1826,7 @@ void UpdateGraphicsScreen(Screen_t& screen)
         // Note: this was guarded by an if(!LevelEditor) condition in the past
         if(Background2[S] == 0)
         {
-            XRender::renderRect(vScreen[Z].ScreenLeft, vScreen[Z].ScreenTop,
+            XRender::renderRect(vScreen[Z].TargetX(), vScreen[Z].TargetY(),
                                 vScreen[Z].Width, vScreen[Z].Height, {0, 0, 0}, true);
         }
 
@@ -2147,6 +2147,11 @@ void UpdateGraphicsScreen(Screen_t& screen)
                     XRender::renderTexture(camX + NPC[A].Location.X + NPC[A]->FrameOffsetX, camY + NPC[A].Location.Y + NPC[A]->FrameOffsetY, NPC[A].Location.Width, NPC[A].Location.Height, GFXNPC[NPC[A].Type], NPC[A]->TWidth - NPC[A].Location.Width, NPC[A].Frame * NPC[A]->THeight, cn);
                 }
             }
+            // fix a graphical SMBX64 bug where the draw width and frame stride were incorrect
+            else if(NPC[A]->WidthGFX != 0 && NPC[A].Effect == NPCEFF_EMERGE_UP && g_compatibility.fix_visual_bugs)
+            {
+                XRender::renderTexture(camX + NPC[A].Location.X + NPC[A]->FrameOffsetX - NPC[A]->WidthGFX / 2.0 + NPC[A].Location.Width / 2.0, camY + NPC[A].Location.Y + NPC[A]->FrameOffsetY, NPC[A]->WidthGFX, NPC[A].Location.Height, GFXNPC[NPC[A].Type], 0, NPC[A].Frame * NPC[A]->HeightGFX, cn);
+            }
             else if(NPC[A]->WidthGFX == 0 || NPC[A].Effect == NPCEFF_EMERGE_UP)
             {
                 XRender::renderTexture(camX + NPC[A].Location.X + NPC[A]->FrameOffsetX, camY + NPC[A].Location.Y + NPC[A]->FrameOffsetY, NPC[A].Location.Width, NPC[A].Location.Height, GFXNPC[NPC[A].Type], 0, NPC[A].Frame * NPC[A]->THeight, cn);
@@ -2435,7 +2440,7 @@ void UpdateGraphicsScreen(Screen_t& screen)
                     double offX = wasShrinkResized ? 0.05 : 0.0;
                     double offW = wasShrinkResized ? 0.1 : 0.0;
                     XRender::renderTexture(sX - offX,
-                                          sY + block.ShakeY3,
+                                          sY + block.ShakeOffset,
                                           block.Location.Width + offW,
                                           block.Location.Height,
                                           GFXBlock[block.Type],
@@ -2867,7 +2872,7 @@ void UpdateGraphicsScreen(Screen_t& screen)
                 double offX = wasShrinkResized ? 0.05 : 0.0;
                 double offW = wasShrinkResized ? 0.1 : 0.0;
                 XRender::renderTexture(camX + block.Location.X - offX,
-                                      camY + block.Location.Y + block.ShakeY3,
+                                      camY + block.Location.Y + block.ShakeOffset,
                                       block.Location.Width + offW,
                                       block.Location.Height,
                                       GFXBlock[block.Type],
@@ -2986,7 +2991,7 @@ void UpdateGraphicsScreen(Screen_t& screen)
 
                     if(w.save_info().inited() && w.save_info().max_medals > 0)
                     {
-                        uint8_t ckpt = (InHub() && Checkpoint == FileNamePath + GetS(w.level)) ? g_curLevelMedals.got : 0;
+                        uint8_t ckpt = (IsHubLevel && Checkpoint == FileNamePath + GetS(w.level)) ? g_curLevelMedals.got : 0;
 
                         DrawMedals(p_center_x, info_y, true, w.save_info().max_medals, 0, ckpt, w.save_info().medals_got, w.save_info().medals_best);
                     }

@@ -52,6 +52,7 @@
 #include "core/render.h"
 #include "core/events.h"
 #include "compat.h"
+#include "script/luna/lunacounter.h"
 
 #include "npc/npc_queues.h"
 
@@ -718,18 +719,18 @@ void PlayerHurt(const int A)
                         p.ForceHitSpot3 = true;
                         p.Location.Y = NPC[numNPCs].Location.Y - p.Location.Height;
 
-                        for(int B = 1; B <= numNPCs; B++)
+                        for(int B : NPCQueues::Active.no_change)
                         {
-                            if(NPC[B].standingOnPlayer == A)
+                            if(NPC[B].vehiclePlr == A)
                             {
-                                NPC[B].standingOnPlayer = 0;
+                                NPC[B].vehiclePlr = 0;
                                 NPC[B].Location.SpeedY = 0;
-                                NPC[B].Location.Y = NPC[numNPCs].Location.Y - 0.1 - NPC[B].standingOnPlayerY;
+                                NPC[B].Location.Y = NPC[numNPCs].Location.Y - 0.1 - NPC[B].vehicleYOffset;
                                 treeNPCUpdate(B);
                                 if(NPC[B].tempBlock > 0)
                                     treeNPCSplitTempBlock(B);
 
-                                NPC[B].standingOnPlayerY = 0;
+                                NPC[B].vehicleYOffset = 0;
                                 if(NPC[B].Type == NPCID_CANNONITEM)
                                     NPC[B].Special = 0;
                                 if(NPC[B].Type == NPCID_TOOTHY)
@@ -826,7 +827,7 @@ void PlayerDead(int A)
         numNPCs++;
         NPC[numNPCs] = NPC_t();
         NPC[numNPCs].Direction = p.Direction;
-        if(Maths::iRound(NPC[numNPCs].Direction) == 1)
+        if(NPC[numNPCs].Direction == 1)
             NPC[numNPCs].Frame = 4;
         NPC[numNPCs].Frame += SpecialFrame[2];
         NPC[numNPCs].Active = true;
@@ -1085,6 +1086,14 @@ void EveryonesDead()
     LevelMacro = LEVELMACRO_OFF;
     FreezeNPCs = false;
 
+    // Quit to world map if died on sub-hub
+    if(!NoMap && IsHubLevel && !FileRecentSubHubLevel.empty())
+    {
+        FileRecentSubHubLevel.clear();
+        ReturnWarp = 0;
+        ReturnWarpSaved = 0;
+    }
+
 // Play fade effect instead of wait (see ProcessLastDead() above)
     if(!g_config.EnableInterLevelFade)
     {
@@ -1096,6 +1105,9 @@ void EveryonesDead()
         if(!MaxFPS)
             PGE_Delay(500);
     }
+
+    if(g_ClonedPlayerMode)
+        gDeathCounter.MarkDeath();
 
     if(g_compatibility.modern_lives_system)
     {
@@ -2384,7 +2396,7 @@ void TailSwipe(const int plr, bool boo, bool Stab, int StabDir)
         // lBlock = LastBlock[((tailLoc.X + tailLoc.Width) / 32.0) + 1];
         // blockTileGet(tailLoc, fBlock, lBlock);
 
-        for(BlockRef_t block_p : treeBlockQuery(tailLoc, SORTMODE_COMPAT))
+        for(BlockRef_t block_p : treeFLBlockQuery(tailLoc, SORTMODE_COMPAT))
         {
             Block_t& block = *block_p;
             A = (int)block_p;
@@ -2393,7 +2405,8 @@ void TailSwipe(const int plr, bool boo, bool Stab, int StabDir)
             {
                 if(CheckCollision(tailLoc, block.Location))
                 {
-                    if(block.ShakeY == 0 && block.ShakeY2 == 0 && block.ShakeY3 == 0)
+                    // if(block.ShakeY == 0 && block.ShakeY2 == 0 && block.ShakeY3 == 0)
+                    if(block.ShakeCounter == 0)
                     {
                         if(block.Special > 0 || block.Type == 55 || block.Type == 159 || block.Type == 90)
                             PlaySoundSpatial(SFX_BlockHit, block.Location);
@@ -2416,7 +2429,8 @@ void TailSwipe(const int plr, bool boo, bool Stab, int StabDir)
                         BlockHitHard(A);
                         if(!Stab)
                         {
-                            if(block.ShakeY != 0)
+                            // if(block.ShakeY != 0)
+                            if(block.ShakeCounter != 0)
                             {
                                 tempLoc.X = (block.Location.X + tailLoc.X + (block.Location.Width + tailLoc.Width) / 2.0) / 2 - 16;
                                 tempLoc.Y = (block.Location.Y + tailLoc.Y + (block.Location.Height + tailLoc.Height) / 2.0) / 2 - 16;
@@ -2428,7 +2442,10 @@ void TailSwipe(const int plr, bool boo, bool Stab, int StabDir)
                         {
                             if(StabDir == 2)
                             {
-                                if(block.Type == 293 || block.Type == 370 || block.ShakeY != 0 || block.ShakeY2 != 0 || block.ShakeY3 != 0 || block.Hidden || BlockHurts[block.Type])
+                                if(block.Type == 293 || block.Type == 370
+                                    /* || block.ShakeY != 0 || block.ShakeY2 != 0 || block.ShakeY3 != 0 */
+                                    || block.ShakeCounter != 0
+                                    || block.Hidden || BlockHurts[block.Type])
                                 {
                                     if(BlockHurts[block.Type])
                                         PlaySoundSpatial(SFX_Spring, block.Location);
@@ -3024,7 +3041,7 @@ void PlayerDismount(const int A)
         Player[A].Mount = 0;
         numNPCs++;
         NPC[numNPCs].Direction = Player[A].Direction;
-        if(Maths::iRound(NPC[numNPCs].Direction) == 1)
+        if(NPC[numNPCs].Direction == 1)
             NPC[numNPCs].Frame = 4;
         NPC[numNPCs].Frame = NPC[numNPCs].Frame + SpecialFrame[2];
         NPC[numNPCs].Active = true;
@@ -3062,16 +3079,16 @@ void PlayerDismount(const int A)
             }
         }
 
-        for(int numNPCsMax3 = numNPCs, B = 1; B <= numNPCsMax3; B++)
+        for(int B : NPCQueues::Active.no_change)
         {
-            if(NPC[B].standingOnPlayer == A)
+            if(NPC[B].vehiclePlr == A)
             {
-                NPC[B].standingOnPlayer = 0;
+                NPC[B].vehiclePlr = 0;
                 NPC[B].Location.SpeedY = 0;
-                NPC[B].Location.Y = NPC[numNPCs].Location.Y - 0.1 - NPC[B].standingOnPlayerY;
+                NPC[B].Location.Y = NPC[numNPCs].Location.Y - 0.1 - NPC[B].vehicleYOffset;
                 treeNPCUpdate(B);
 
-                NPC[B].standingOnPlayerY = 0;
+                NPC[B].vehicleYOffset = 0;
                 if(NPC[B].Type == NPCID_CANNONITEM)
                     NPC[B].Special = 0;
                 if(NPC[B].Type == NPCID_TOOTHY)
@@ -3190,14 +3207,17 @@ void PlayerPush(const int A, int HitSpot)
     // lBlock = LastBlock[((p.Location.X + p.Location.Width) / 32.0) + 1];
     // blockTileGet(p.Location, fBlock, lBlock);
 
-    for(BlockRef_t block : treeBlockQuery(p.Location, SORTMODE_COMPAT))
+    UpdatableQuery<BlockRef_t> q(p.Location, SORTMODE_COMPAT, QUERY_FLBLOCK);
+
+    for(auto it = q.begin(); it != q.end(); ++it)
     {
-        int B = block;
-        Block_t& b = *block;
+        int B = *it;
+        Block_t& b = **it;
 
         if(b.Hidden || BlockIsSizable[b.Type])
             continue;
 
+        // Note: could also apply this for a downwards clip when colliding with an invisible block
         if(g_compatibility.fix_player_filter_bounce && BlockCheckPlayerFilter(B, A))
             continue;
 
@@ -3211,13 +3231,17 @@ void PlayerPush(const int A, int HitSpot)
                 {
                     if(HitSpot == 2)
                     {
-                        // TODO: investigate this vanilla bug and see if it's worth making a fix
+                        // Note: this vanilla peculiarity (Width should be subtracted) only affects a victim spat rightwards out of a pet's mouth.
+                        // If spat rightwards against a wall, the victim teleports to the left through the player who spat them out.
+                        // If spat leftwards against a wall (non-bugged behavior), the player who spat them out gets pushed rightwards.
                         p.Location.X = b.Location.X - p.Location.Height - 0.01;
                     }
                     else if(HitSpot == 3)
                         p.Location.Y = b.Location.Y + b.Location.Height + 0.01;
                     else if(HitSpot == 4)
                         p.Location.X = b.Location.X + b.Location.Width + 0.01;
+
+                    q.update(p.Location, it);
                 }
             }
         }
@@ -3929,9 +3953,9 @@ void ClownCar()
                 }
             }
 
-            for(int numNPCsMax8 = numNPCs, B = 1; B <= numNPCsMax8; B++)
+            for(int B : NPCQueues::Active.may_insert)
             {
-                if(NPC[B].standingOnPlayer == A && NPC[B].Type != NPCID_TOOTHY)
+                if(NPC[B].vehiclePlr == A && NPC[B].Type != NPCID_TOOTHY)
                 {
                     if(Player[A].Effect == 0)
                         NPC[B].Location.X += Player[A].Location.SpeedX + double(Player[A].mountBump);
@@ -3940,7 +3964,7 @@ void ClownCar()
                     NPC[B].Location.SpeedX = 0;
                     if(Player[A].Effect != 0)
                         NPC[B].Location.SpeedY = 0;
-                    NPC[B].Location.Y = Player[A].Location.Y + NPC[B].Location.SpeedY + 0.1 - NPC[B].standingOnPlayerY;
+                    NPC[B].Location.Y = Player[A].Location.Y + NPC[B].Location.SpeedY + 0.1 - NPC[B].vehicleYOffset;
                     treeNPCUpdate(B);
 
                     if(Player[A].Controls.Run)
@@ -3962,22 +3986,24 @@ void ClownCar()
                                 NPC[numNPCs].Special = A;
                                 NPC[numNPCs].Special2 = B;
                                 NPC[numNPCs].Direction = NPC[B].Direction;
-                                if(Maths::iRound(NPC[numNPCs].Direction) == 1)
+                                if(NPC[numNPCs].Direction == 1)
                                     NPC[numNPCs].Frame = 2;
                                 syncLayers_NPC(numNPCs);
                             }
 
-                            for(int numNPCsMax9 = numNPCs, C = 1; C <= numNPCsMax9; C++)
+                            for(int C : NPCQueues::Active.no_change)
                             {
                                 if(NPC[C].Type == NPCID_TOOTHY && Maths::iRound(NPC[C].Special) == A && Maths::iRound(NPC[C].Special2) == B)
                                 {
-                                    NPC[C].standingOnPlayer = A;
+                                    NPC[C].vehiclePlr = A;
                                     NPC[C].Projectile = true;
                                     NPC[C].Direction = NPC[B].Direction;
+
                                     if(NPC[C].Direction > 0)
                                         NPC[C].Location.X = NPC[B].Location.X + 32;
                                     else
                                         NPC[C].Location.X = NPC[B].Location.X - NPC[C].Location.Width;
+
                                     NPC[C].Location.Y = NPC[B].Location.Y;
                                     NPC[C].TimeLeft = 100;
                                     treeNPCUpdate(C);
@@ -3996,7 +4022,7 @@ void ClownCar()
 
                     for(int C : treeNPCQuery(tempLocation, SORTMODE_NONE))
                     {
-                        if(B != C && (NPC[C].standingOnPlayer == A || NPC[C].playerTemp))
+                        if(B != C && (NPC[C].vehiclePlr == A || NPC[C].playerTemp))
                         {
                             if(CheckCollision(tempLocation, NPC[C].Location))
                             {
@@ -4008,8 +4034,8 @@ void ClownCar()
 
                     if(!tempBool)
                     {
-                        NPC[B].standingOnPlayer = 0;
-                        NPC[B].standingOnPlayerY = 0;
+                        NPC[B].vehiclePlr = 0;
+                        NPC[B].vehicleYOffset = 0;
                     }
                     else
                         NPC[B].Location.SpeedX = 0;
@@ -4891,7 +4917,7 @@ static inline bool checkWarp(Warp_t &warp, int B, Player_t &plr, int A, bool bac
                     plr.Warp = B;
                     plr.WarpBackward = backward;
                     ReturnWarp = B;
-                    if(IsEpisodeIntro && NoMap)
+                    if(IsHubLevel)
                         ReturnWarpSaved = ReturnWarp;
                     StartWarp = warp.LevelWarp;
                     return true;
@@ -5438,6 +5464,7 @@ void PlayerGrabCode(const int A, bool DontResetGrabTime)
                     NPC[p.HoldingNPC].Location.X = p.Location.X + p.Location.Width - Physics.PlayerGrabSpotX[p.Character][p.State] - NPC[p.HoldingNPC].Location.Width;
                 NPC[p.HoldingNPC].Location.Y = p.Location.Y + Physics.PlayerGrabSpotY[p.Character][p.State] + 32 - NPC[p.HoldingNPC].Location.Height;
             }
+
             if(NPC[p.HoldingNPC].Type == NPCID_TOOTHYPIPE && !FreezeNPCs)
             {
                 if(NPC[p.HoldingNPC].Special == 0.0)
@@ -5457,7 +5484,8 @@ void PlayerGrabCode(const int A, bool DontResetGrabTime)
                         NPC[numNPCs].Frame = 2;
                     syncLayers_NPC(numNPCs);
                 }
-                for(B = 1; B <= numNPCs; B++)
+
+                for(int B : NPCQueues::Active.no_change)
                 {
                     if(NPC[B].Type == NPCID_TOOTHY && NPC[B].Special == A)
                     {
@@ -6644,7 +6672,7 @@ void PlayerEffects(const int A)
                 p.Effect = 8;
                 p.Effect2 = 2970;
                 ReturnWarp = p.Warp;
-                if(IsEpisodeIntro && NoMap)
+                if(IsHubLevel)
                     ReturnWarpSaved = ReturnWarp;
                 StartWarp = warp.LevelWarp;
             }
@@ -7235,7 +7263,7 @@ void PlayerEffects(const int A)
                 p.Effect2 = 3000;
                 ReturnWarp = p.Warp;
 
-                if(IsEpisodeIntro && NoMap)
+                if(IsHubLevel)
                     ReturnWarpSaved = ReturnWarp;
 
                 StartWarp = warp.LevelWarp;
@@ -7914,27 +7942,29 @@ void DropPlayer(const int A)
     for(int C = 1; C <= numNPCs; C++)
     {
         NPC_t& n = NPC[C];
+
         // most of these should not be equal because PlayerGone has already been called.
-        if(n.standingOnPlayer > A)
-            n.standingOnPlayer --;
-        else if(n.standingOnPlayer == A)
-            n.standingOnPlayer = 0;
-        if(n.HoldingPlayer > A)
+        if(n.vehiclePlr > A && n.vehiclePlr <= numPlayers)
+            n.vehiclePlr --;
+        else if(n.vehiclePlr == A)
+            n.vehiclePlr = 0;
+
+        if(n.HoldingPlayer > A && n.HoldingPlayer <= numPlayers)
             n.HoldingPlayer --;
         else if(n.HoldingPlayer == A)
             n.HoldingPlayer = 0;
-        if(n.CantHurt > A)
-            n.CantHurt --;
-        else if(n.CantHurt == A)
-            n.CantHurt = 0;
-        if(n.CantHurtPlayer > A)
+
+        if(n.CantHurtPlayer > A && n.CantHurtPlayer <= numPlayers)
             n.CantHurtPlayer --;
         else if(n.CantHurtPlayer == A)
             n.CantHurtPlayer = 0;
-        if(n.BattleOwner > A)
+
+        if(n.BattleOwner > A && n.BattleOwner <= numPlayers)
             n.BattleOwner --;
         else if(n.BattleOwner == A)
             n.BattleOwner = 0;
+
+        // this is not quite right (the vScreen index doesn't necessarily equal the player index, and might not get removed)
         if(n.JustActivated > A)
             n.JustActivated --;
         else if(n.JustActivated == A)
@@ -8047,7 +8077,7 @@ void SwapCharacter(int A, int Character, bool FromBlock)
 // returns whether a player is allowed to swap characters
 bool SwapCharAllowed()
 {
-    if(LevelSelect || GameMenu || (g_compatibility.allow_drop_add && InHub()))
+    if(LevelSelect || GameMenu || (g_compatibility.allow_drop_add && IsHubLevel))
         return true;
     else
         return false;

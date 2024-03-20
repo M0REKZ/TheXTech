@@ -128,12 +128,6 @@ struct TableInterface
             layer_table[layer].erase(item);
     }
 
-    static inline bool _compare_Z(BaseRef_t a, BaseRef_t b)
-    {
-        // sort by index when unimplemented
-        return a < b;
-    }
-
     inline void query(std::vector<BaseRef_t>& out, const Location_t& _loc, int sort_mode)
     {
         // ignore improper rects
@@ -144,6 +138,8 @@ struct TableInterface
 
         // NOTE: there are extremely rare cases when these margins are not sufficient for full compatibility
         //   (such as, when an item is trapped inside a wall during !BlocksSorted)
+        // This should be fixed for players now.
+        // Conversely, there may be cases where this is too much when BlocksSorted is true and an FLBlock query was made.
         if(g_compatibility.emulate_classic_block_order)
         {
             loc.l -= 32;
@@ -189,27 +185,11 @@ struct TableInterface
         }
 
         if(sort_mode == SORTMODE_LOC)
-        {
-            std::sort(out.begin(), out.end(),
-            [](BaseRef_t a, BaseRef_t b)
-            {
-                return (((ItemRef_t)a)->Location.X <= ((ItemRef_t)b)->Location.X
-                    && (((ItemRef_t)a)->Location.X < ((ItemRef_t)b)->Location.X
-                        || ((ItemRef_t)a)->Location.Y < ((ItemRef_t)b)->Location.Y));
-            });
-        }
+            std::sort(out.begin(), out.end(), Comparisons::Loc<ItemRef_t>);
         else if(sort_mode == SORTMODE_ID)
-        {
-            std::sort(out.begin(), out.end(),
-            [](BaseRef_t a, BaseRef_t b)
-            {
-                return a < b;
-            });
-        }
+            std::sort(out.begin(), out.end(), Comparisons::ID<ItemRef_t>);
         else if(sort_mode == SORTMODE_Z)
-        {
-            std::sort(out.begin(), out.end(), _compare_Z);
-        }
+            std::sort(out.begin(), out.end(), Comparisons::Z<ItemRef_t>);
     }
 
     void query(std::vector<BaseRef_t>& out, double Left, double Top, double Right, double Bottom,
@@ -244,14 +224,6 @@ struct TableInterface
         return query(loc, sort_mode);
     }
 };
-
-template<>
-bool TableInterface<BackgroundRef_t>::_compare_Z(BaseRef_t a, BaseRef_t b)
-{
-    return (((BackgroundRef_t)a)->SortPriority < ((BackgroundRef_t)b)->SortPriority)
-        || (((BackgroundRef_t)a)->SortPriority == ((BackgroundRef_t)b)->SortPriority
-            && ((BackgroundRef_t)a)->Location.X < ((BackgroundRef_t)b)->Location.X);
-}
 
 table_t<BlockRef_t> s_temp_block_table;
 table_t<NPCRef_t> s_npc_table;
@@ -307,19 +279,19 @@ void treeBlockRemoveLayer(int layer, BlockRef_t block)
     s_block_tables.erase(layer, block);
 }
 
-TreeResult_Sentinel<BlockRef_t> treeBlockQuery(double Left, double Top, double Right, double Bottom,
+TreeResult_Sentinel<BlockRef_t> treeFLBlockQuery(double Left, double Top, double Right, double Bottom,
                          int sort_mode,
                          double margin)
 {
     return s_block_tables.query(Left, Top, Right, Bottom, sort_mode, margin);
 }
 
-void treeBlockQuery(std::vector<BaseRef_t>& out, const Location_t &loc, int sort_mode)
+void treeFLBlockQuery(std::vector<BaseRef_t>& out, const Location_t &loc, int sort_mode)
 {
     s_block_tables.query(out, loc, sort_mode);
 }
 
-TreeResult_Sentinel<BlockRef_t> treeBlockQuery(const Location_t &loc,
+TreeResult_Sentinel<BlockRef_t> treeFLBlockQuery(const Location_t &loc,
                          int sort_mode)
 {
     return s_block_tables.query(loc, sort_mode);
@@ -395,17 +367,16 @@ void treeTempBlockRemove(BlockRef_t obj)
     s_temp_block_table.erase(obj);
 }
 
-TreeResult_Sentinel<BlockRef_t> treeTempBlockQuery(const Location_t &_loc,
-                         int sort_mode)
+void treeTempBlockQuery(std::vector<BaseRef_t>& out,
+                        const Location_t &_loc,
+                        int sort_mode)
 {
-    TreeResult_Sentinel<BlockRef_t> result;
-
     if(!s_temp_blocks_enabled)
-        return result;
+        return;
 
     // ignore improper rects
     if(_loc.Width < 0 || _loc.Height < 0)
-        return result;
+        return;
 
     rect_external loc = _loc;
 
@@ -427,47 +398,35 @@ TreeResult_Sentinel<BlockRef_t> treeTempBlockQuery(const Location_t &_loc,
     }
 
 
-    s_npc_table.query(*result.i_vec, loc);
+    s_npc_table.query(out, loc);
 
-    s_NPCsToTempBlocks(*result.i_vec);
+    s_NPCsToTempBlocks(out);
 
-    s_temp_block_table.query(*result.i_vec, loc);
+    s_temp_block_table.query(out, loc);
 
 
     if(sort_mode == SORTMODE_COMPAT)
     {
-        sort_mode = SORTMODE_LOC;
+        if(g_compatibility.emulate_classic_block_order)
+            sort_mode = SORTMODE_ID;
+        else
+            sort_mode = SORTMODE_LOC;
     }
 
     if(sort_mode == SORTMODE_LOC)
-    {
-        std::sort(result.i_vec->begin(), result.i_vec->end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            return (((BlockRef_t)a)->Location.X <= ((BlockRef_t)b)->Location.X
-                && (((BlockRef_t)a)->Location.X < ((BlockRef_t)b)->Location.X
-                    || ((BlockRef_t)a)->Location.Y < ((BlockRef_t)b)->Location.Y));
-        });
-    }
+        std::sort(out.begin(), out.end(), Comparisons::Loc<BlockRef_t>);
     else if(sort_mode == SORTMODE_ID)
-    {
-        std::sort(result.i_vec->begin(), result.i_vec->end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            return a.index < b.index;
-        });
-    }
+        std::sort(out.begin(), out.end(), Comparisons::ID<BlockRef_t>);
     else if(sort_mode == SORTMODE_Z)
-    {
-        std::sort(result.i_vec->begin(), result.i_vec->end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            // not implemented yet, might never be
-            // instead, just sort by the index
-            // (which is currently the same as z-order)
-            return a.index < b.index;
-        });
-    }
+        std::sort(out.begin(), out.end(), Comparisons::Z<BlockRef_t>);
+}
+
+TreeResult_Sentinel<BlockRef_t> treeTempBlockQuery(const Location_t &_loc,
+                        int sort_mode)
+{
+    TreeResult_Sentinel<BlockRef_t> result;
+
+    treeTempBlockQuery(*result.i_vec, _loc, sort_mode);
 
     return result;
 }
@@ -486,7 +445,7 @@ TreeResult_Sentinel<BlockRef_t> treeTempBlockQuery(double Left, double Top, doub
 
 /* ================= Combined Block Query ============== */
 
-TreeResult_Sentinel<BlockRef_t> treeBlockQueryWithTemp(const Location_t &_loc,
+TreeResult_Sentinel<BlockRef_t> treeBlockQuery(const Location_t &_loc,
                          int sort_mode)
 {
     TreeResult_Sentinel<BlockRef_t> result;
@@ -533,11 +492,12 @@ TreeResult_Sentinel<BlockRef_t> treeBlockQueryWithTemp(const Location_t &_loc,
         loc.Y = oY;
     }
 
-    auto pre_temp_size = result.i_vec->size();
 
-
+    // this is where this function differs from the standard TableInterface::query
     if(s_temp_blocks_enabled)
     {
+        auto pre_temp_size = result.i_vec->size();
+
         s_npc_table.query(*result.i_vec, loc);
 
         s_NPCsToTempBlocks(*result.i_vec, pre_temp_size);
@@ -546,54 +506,20 @@ TreeResult_Sentinel<BlockRef_t> treeBlockQueryWithTemp(const Location_t &_loc,
     }
 
 
-    // sort real ones by ID, temp ones by loc, and have them arranged this way
     if(sort_mode == SORTMODE_COMPAT)
     {
-        std::sort(result.i_vec->begin(), result.i_vec->begin() + pre_temp_size,
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            return a.index < b.index;
-        });
-
-        std::sort(result.i_vec->begin() + pre_temp_size, result.i_vec->end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            return (((BlockRef_t)a)->Location.X <= ((BlockRef_t)b)->Location.X
-                && (((BlockRef_t)a)->Location.X < ((BlockRef_t)b)->Location.X
-                    || ((BlockRef_t)a)->Location.Y < ((BlockRef_t)b)->Location.Y));
-        });
+        if(g_compatibility.emulate_classic_block_order)
+            sort_mode = SORTMODE_ID;
+        else
+            sort_mode = SORTMODE_LOC;
     }
-
 
     if(sort_mode == SORTMODE_LOC)
-    {
-        std::sort(result.i_vec->begin(), result.i_vec->end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            return (((BlockRef_t)a)->Location.X <= ((BlockRef_t)b)->Location.X
-                && (((BlockRef_t)a)->Location.X < ((BlockRef_t)b)->Location.X
-                    || ((BlockRef_t)a)->Location.Y < ((BlockRef_t)b)->Location.Y));
-        });
-    }
+        std::sort(result.i_vec->begin(), result.i_vec->end(), Comparisons::Loc<BlockRef_t>);
     else if(sort_mode == SORTMODE_ID)
-    {
-        std::sort(result.i_vec->begin(), result.i_vec->end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            return a.index < b.index;
-        });
-    }
+        std::sort(result.i_vec->begin(), result.i_vec->end(), Comparisons::ID<BlockRef_t>);
     else if(sort_mode == SORTMODE_Z)
-    {
-        std::sort(result.i_vec->begin(), result.i_vec->end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            // not implemented yet, might never be
-            // instead, just sort by the index
-            // (which is currently the same as z-order)
-            return a.index < b.index;
-        });
-    }
+        std::sort(result.i_vec->begin(), result.i_vec->end(), Comparisons::Z<BlockRef_t>);
 
     return result;
 }
@@ -738,39 +664,14 @@ void treeNPCQuery(std::vector<BaseRef_t>& out, const Location_t &_loc, int sort_
     s_npc_table.query(out, loc);
 
     if(sort_mode == SORTMODE_COMPAT)
-    {
         sort_mode = SORTMODE_ID;
-    }
 
     if(sort_mode == SORTMODE_LOC)
-    {
-        std::sort(out.begin(), out.end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            return (((NPCRef_t)a)->Location.X <= ((NPCRef_t)b)->Location.X
-                && (((NPCRef_t)a)->Location.X < ((NPCRef_t)b)->Location.X
-                    || ((NPCRef_t)a)->Location.Y < ((NPCRef_t)b)->Location.Y));
-        });
-    }
+        std::sort(out.begin(), out.end(), Comparisons::Loc<NPCRef_t>);
     else if(sort_mode == SORTMODE_ID)
-    {
-        std::sort(out.begin(), out.end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            return a.index < b.index;
-        });
-    }
+        std::sort(out.begin(), out.end(), Comparisons::ID<NPCRef_t>);
     else if(sort_mode == SORTMODE_Z)
-    {
-        std::sort(out.begin(), out.end(),
-        [](BaseRef_t a, BaseRef_t b)
-        {
-            // not implemented yet, might never be
-            // instead, just sort by the index
-            // (which is currently the same as z-order)
-            return a.index < b.index;
-        });
-    }
+        std::sort(out.begin(), out.end(), Comparisons::Z<NPCRef_t>);
 }
 
 TreeResult_Sentinel<NPCRef_t> treeNPCQuery(const Location_t &_loc,

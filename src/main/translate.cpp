@@ -42,6 +42,7 @@
 #include "main/game_info.h"
 #include "main/outro_loop.h"
 #include "main/game_strings.h"
+#include "main/hints.h"
 
 #include "controls.h"
 #include "config.h"
@@ -86,7 +87,7 @@ const std::string& LanguageFormatNumber(int number, const std::string& singular,
 }
 
 #ifndef THEXTECH_DISABLE_LANG_TOOLS
-static void setJsonValue(nlohmann::json &j, const std::string &key, const std::string &value)
+static void setJsonValue(nlohmann::ordered_json &j, const std::string &key, const std::string &value)
 {
     auto dot = key.find(".");
     if(dot == std::string::npos)
@@ -99,7 +100,7 @@ static void setJsonValue(nlohmann::json &j, const std::string &key, const std::s
     setJsonValue(j[subKey], key.substr(dot + 1), value);
 }
 
-static bool setJsonValueIfNotExist(nlohmann::json &j, const std::string &key, const std::string &value, bool noBlank)
+static bool setJsonValueIfNotExist(nlohmann::ordered_json &j, const std::string &key, const std::string &value, bool noBlank)
 {
     auto dot = key.find(".");
     if(dot == std::string::npos)
@@ -110,7 +111,7 @@ static bool setJsonValueIfNotExist(nlohmann::json &j, const std::string &key, co
             std::fflush(stdout);
             if(!noBlank || !value.empty())
                 j[key] = value;
-            else
+            else if(j.contains(key))
                 j.erase(key);
             return true;
         }
@@ -118,16 +119,21 @@ static bool setJsonValueIfNotExist(nlohmann::json &j, const std::string &key, co
     }
 
     std::string subKey = key.substr(0, dot);
-    return setJsonValueIfNotExist(j[subKey], key.substr(dot + 1), value, noBlank);
+    bool ret = setJsonValueIfNotExist(j[subKey], key.substr(dot + 1), value, noBlank);
+
+    if(noBlank && (j[subKey].is_null() || j[subKey].empty()))
+        j.erase(subKey);
+
+    return ret;
 }
 #endif
 
-static std::string getJsonValue(nlohmann::json &j, const std::string &key, const std::string &defVal)
+static std::string getJsonValue(nlohmann::ordered_json &j, const std::string &key, const std::string &defVal)
 {
     auto dot = key.find(".");
     if(dot == std::string::npos)
     {
-        if(!j.contains(key))
+        if(!j.contains(key) || j[key].is_null())
             return defVal;
 
         auto out = j.value(key, defVal);
@@ -719,10 +725,9 @@ XTechTranslate::XTechTranslate()
         {"editor.file.commandSave",         &g_editorStrings.fileCommandSave},
         {"editor.file.commandSaveAs",       &g_editorStrings.fileCommandSaveAs},
 
-        {"editor.file.convert.desc",                &g_editorStrings.fileConvertDesc},
-        {"editor.file.convert.noIssues",            &g_editorStrings.fileConvertNoIssues},
-        {"editor.file.convert.featuresWillBeLost",  &g_editorStrings.fileConvertFeaturesWillBeLost},
+        {"editor.file.convert.descNew",             &g_editorStrings.fileConvertDesc},
 
+#if 0
         {"editor.file.convert._38aUnsupported",     &g_editorStrings.fileConvert38aUnsupported},
         {"editor.file.convert.formatUnknown",       &g_editorStrings.fileConvertFormatUnknown},
 
@@ -746,6 +751,7 @@ XTechTranslate::XTechTranslate()
         {"editor.file.convert.featureWorldStarDisplay", &g_editorStrings.fileConvertFeatureWorldStarDisplay},
         {"editor.file.convert.featureLevelStarDisplay", &g_editorStrings.fileConvertFeatureLevelStarDisplay},
         {"editor.file.convert.featureWorldMapSections", &g_editorStrings.fileConvertFeatureWorldMapSections},
+#endif
 
         {"editor.browser.newFile",          &g_editorStrings.browserNewFile},
         {"editor.browser.saveFile",         &g_editorStrings.browserSaveFile},
@@ -805,6 +811,8 @@ XTechTranslate::XTechTranslate()
     // adds dynamic fields to the asset map
     EditorCustom::Load(this);
 #endif
+
+    XHints::InitTranslations(*this);
 }
 
 void XTechTranslate::reset()
@@ -823,6 +831,8 @@ void XTechTranslate::reset()
     Controls::InitStrings();
     g_controlsStrings = ControlsStrings_t();
 
+    XHints::ResetStrings();
+
     s_CurrentPluralRules = PluralRules::OneIsSingular;
 }
 
@@ -833,7 +843,7 @@ void XTechTranslate::exportTemplate()
 
     try
     {
-        nlohmann::json langFile;
+        nlohmann::ordered_json langFile;
 
         for(auto &k : m_engineMap)
         {
@@ -908,7 +918,7 @@ void XTechTranslate::updateLanguages(const std::string &outPath, bool noBlank)
                 continue;
             }
 
-            nlohmann::json langFile = nlohmann::json::parse(data);
+            nlohmann::ordered_json langFile = nlohmann::ordered_json::parse(data);
 
             for(const auto &k : trList)
             {
@@ -936,7 +946,7 @@ void XTechTranslate::updateLanguages(const std::string &outPath, bool noBlank)
         }
         catch(const std::exception &e)
         {
-            std::printf("Warning: Failed to load the translation file %s: %s\n", fullFilePath.c_str(), e.what());
+            std::printf("Warning: Failed to process the translation file %s: %s\n", fullFilePath.c_str(), e.what());
         }
     }
 
@@ -999,7 +1009,7 @@ bool XTechTranslate::translateFile(const std::string& file, TrList& list, const 
     try
     {
         std::string data;
-        nlohmann::json langFile;
+        nlohmann::ordered_json langFile;
 
         if(Files::fileExists(file))
         {
@@ -1010,7 +1020,7 @@ bool XTechTranslate::translateFile(const std::string& file, TrList& list, const 
                 return false;
             }
 
-            langFile = nlohmann::json::parse(data);
+            langFile = nlohmann::ordered_json::parse(data);
 
             for(auto &k : list)
             {

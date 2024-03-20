@@ -260,6 +260,7 @@ struct NPC_t
 //    Frame As Integer 'The graphic to be shown
     vbint_t Frame = 0;
 //    tempBlock As Integer
+    // temp block index in the block array
     vbint_t tempBlock = 0;
 
 //    Active As Boolean 'If on screen
@@ -312,24 +313,30 @@ struct NPC_t
 //    Effect As Integer 'For starting / stopping effects
     NPCEffect Effect = NPCEFF_NORMAL;
 //    Effect3 As Integer
-    vbint_t Effect3 = 0;
+    // rarely used for warping NPCs (direction) and for NPCs being eaten (countdown timer initialized to 5)
+    uint8_t Effect3 = 0;
 
-//    Direction As Single 'The direction the NPC is walking
-    float Direction = 0.0f;
-
-    // Moderately important integer variables
+    // Moderately important counter variables
 //    Section As Integer 'what section of the level the NPC is in
-    vbint_t Section = 0;
+    // never set to any non-section values
+    uint8_t Section = 0;
 //    Wet As Integer ' greater then 0 of the NPC is in water
-    vbint_t Wet = 0;
+    // counter for whether NPC is in water, set to 2 when detected, decremented otherwise
+    uint8_t Wet = 0;
 //    Quicksand As Integer
-    vbint_t Quicksand = 0;
+    // counter for whether NPC is in quicksand, set to 2 when detected, decremented otherwise
+    uint8_t Quicksand = 0;
+//    TailCD As Integer 'if greater then 0 the player can't hit with it's tail
+    // set to values up to 12 when whipped / kicked, decremented otherwise
+    uint8_t TailCD = 0;
+//    JustActivated As Integer 'The player that activated the NPC
+    uint8_t JustActivated = 0;
 //    TimeLeft As Integer 'Time left before reset when not on screen
     vbint_t TimeLeft = 0;
-//    TailCD As Integer 'if greater then 0 the player can't hit with it's tail
-    vbint_t TailCD = 0;
-//    JustActivated As Integer 'The player that activated the NPC
-    vbint_t JustActivated = 0;
+
+//    Direction As Single 'The direction the NPC is walking
+    // we have confirmed that this is never assigned a value other than 0, -1, or 1
+    vbint_t Direction = 0;
 
 //    Pinched1 As Integer  'getting smashed by a block
     // int Pinched1 = 0;
@@ -344,15 +351,6 @@ struct NPC_t
 
     // NEW: replaces above with bitfield
     PinchedInfo_t Pinched = PinchedInfo_t();
-
-//    standingOnPlayer As Integer 'If this NPC is standing on a player in the clown car
-    vbint_t standingOnPlayer = 0;
-//    standingOnPlayerY As Integer
-    vbint_t standingOnPlayerY = 0;
-//    Slope As Integer 'the block that the NPC is on a slope with
-    vbint_t Slope = 0;
-//    Multiplier As Integer 'for upping the points the player recieves
-    vbint_t Multiplier = 0;
 
     // indexes to layers / events / text
 //    TriggerActivate As String 'for events - triggers when NPC gets activated
@@ -375,17 +373,31 @@ struct NPC_t
 // EXTRA: Variant (previously Special7)
     uint8_t Variant = 0;
 
+    // some misc variables
+//    Slope As Integer 'the block that the NPC is on a slope with
+    vbint_t Slope = 0;
+//    Multiplier As Integer 'for upping the points the player recieves
+    vbint_t Multiplier = 0;
+//    standingOnPlayerY As Integer
+    vbint_t vehicleYOffset = 0;
+//    standingOnPlayer As Integer 'If this NPC is standing on a player in the clown car
+    uint8_t vehiclePlr = 0;
+
     // Information about Generator state (GeneratorActive in bitfield at the bottom of the struct)
 //    Generator As Boolean 'for spawning new NPCs
     bool Generator = false;
 //    GeneratorDirection As Integer
-    vbint_t GeneratorDirection = 0;
+    // valid values: 0, 1, 2, 3, 4
+    uint8_t GeneratorDirection = 0;
 //    GeneratorEffect As Integer
-    vbint_t GeneratorEffect = 0;
+    // valid values: 0, 1, 2
+    uint8_t GeneratorEffect = 0;
 //    GeneratorTimeMax As Single
-    float GeneratorTimeMax = 0.0f;
+    // surprisingly, never stores any floating point variables. expressed in deci-seconds.
+    vbint_t GeneratorTimeMax = 0;
 //    GeneratorTime As Single
-    float GeneratorTime = 0.0f;
+    // surprisingly, only stores its own limit as a floating point variables. expressed in ticks.
+    vbint_t GeneratorTime = 0;
 
     // Misc floating-point variables
 //    RealSpeedX As Single 'the real speed of the NPC
@@ -397,25 +409,35 @@ struct NPC_t
 //    oldAddBelt As Single
     float oldAddBelt = 0.0f;
 //    Damage As Single
-    float Damage = 0.0f;
+    // never set to a non-integer value, likely used a float for saturation arithemtic
+    vbint_t Damage = 0;
 
-    // Misc integer variables
-//    HoldingPlayer As Integer 'Who is holding it
-    vbint_t HoldingPlayer = 0;
-//    CantHurt As Integer 'Won't hurt the player
-    vbint_t CantHurt = 0;
+    // Player reference variables
 //    CantHurtPlayer As Integer
-    vbint_t CantHurtPlayer = 0;
+    // almost always set to a valid player index; very rarely set to an invalid index for NPCID_FLIPPED_RAINBOW_SHELL, only used to index the player array by NPCID_SWORDBEAM
+    uint8_t CantHurtPlayer = 0;
 //    BattleOwner As Integer 'Owner of the projectile
-    vbint_t BattleOwner = 0;
-//    WallDeath As Integer
-    vbint_t WallDeath = 0;
+    // not only used in battle mode; almost always set to a valid player index, (see above)
+    uint8_t BattleOwner = 0;
+//    HoldingPlayer As Integer 'Who is holding it
+    // only ever set to 0 or a player index
+    uint8_t HoldingPlayer = 0;
+
+    // some more misc counter variables
+//    Immune As Integer 'time that the NPC is immune
+    // set to values up to 100, decremented each frame
+    uint8_t Immune = 0;
+//    CantHurt As Integer 'Won't hurt the player
+    // timer for how long the NPC will be harmless to a certain player, set to values up to 10000
+    vbint_t CantHurt = 0;
 //    RespawnDelay As Integeri
+    // used to respawn an NPC in Battle Mode, set to 65 * 30 (30s) on deactivation and decremented each frame
     vbint_t RespawnDelay = 0;
 //    Block As Integer 'Used when a P-Switch turns a block into a coint
-    vbint_t Block = 0;
-//    Immune As Integer 'time that the NPC is immune
-    vbint_t Immune = 0;
+    vbint_t coinSwitchBlockType = 0;
+//    WallDeath As Integer
+    // tracks whether the NPC was activated in a wall (or is not in water, for fish). set to values between 0 and 10, used as a counter bounded at these values, sometimes very briefly 11.
+    uint8_t WallDeath = 0;
 
     // rarely used bools turned into bitfields
 //    TurnAround As Boolean 'if the NPC needs to turn around
@@ -442,16 +464,17 @@ struct NPC_t
     bool _priv_force_canonical : 1;
 
 //'the default values are used when De-Activating an NPC when it goes on screen
+//    DefaultDirection As Single
+    // changed to int8_t, only ever holds values -1, 0, and 1
+    int8_t DefaultDirection = 0;
 //    DefaultType As Integer
     NPCID DefaultType = NPCID(0);
-//    DefaultLocation As Location
-    Location_t DefaultLocation;
-//    DefaultDirection As Single
-    float DefaultDirection = 0.0f;
 //    DefaultSpecial As Integer
     vbint_t DefaultSpecial = 0;
 //    DefaultSpecial2 As Integer
     vbint_t DefaultSpecial2 = 0;
+//    DefaultLocation As Location
+    SpeedlessLocation_t DefaultLocation;
 
     // obsolete and removed fields
 //    PinchCount As Integer 'obsolete
@@ -826,35 +849,38 @@ struct Block_t
     eventindex_t TriggerLast = EVENT_NONE;
 //    Layer As String
     layerindex_t Layer = LAYER_NONE;
-//    Hidden As Boolean
-    bool Hidden = false;
+//    NPC As Integer 'when a coin is turned into a block after the p switch is hit
+    NPCID coinSwitchNpcType = NPCID(0);
 //    Type As Integer 'the block's type
     vbint_t Type = 0;
 //    Special As Integer 'what is in the block?
     vbint_t Special = 0;
 //'for the shake effect after hitting ablock
 //    ShakeY As Integer
-    vbint_t ShakeY = 0;
 //    ShakeY2 As Integer
-    vbint_t ShakeY2 = 0;
 //    ShakeY3 As Integer
-    vbint_t ShakeY3 = 0;
+    uint8_t ShakeCounter = 0;
+    int8_t ShakeOffset = 0;
 //    Kill As Boolean 'if true the game will destroy the block
     bool Kill = false;
 //    Invis As Boolean 'for invisible blocks
     bool Invis = false;
-//    NPC As Integer 'when a coin is turned into a block after the p switch is hit
-    NPCID NPC = NPCID(0);
+//    Hidden As Boolean
+    bool Hidden = false;
 //    IsPlayer As Integer 'for the clown car
-    vbint_t IsPlayer = 0;
+    uint8_t tempBlockVehiclePlr = 0;
 //    IsNPC As Integer 'the type of NPC the block is
-    NPCID IsNPC = NPCID(0);
+    NPCID tempBlockNpcType = NPCID(0);
 //    standingOnPlayerY As Integer 'when standing on a player in the clown car
-    vbint_t standingOnPlayerY = 0;
+    vbint_t tempBlockVehicleYOffset = 0;
 //    noProjClipping As Boolean
-    bool noProjClipping = false;
+    // bool noProjClipping = false;
 //    IsReally As Integer 'the NPC that is this block
-    vbint_t IsReally = 0;
+    vbint_t tempBlockNpcIdx = 0;
+
+    inline bool tempBlockNoProjClipping() const;
+
+public:
 
 // EXTRA: Indicate the fact that block was resized by a hit
 #ifdef LOW_MEM
@@ -1795,6 +1821,8 @@ extern std::string FileNameFull;
 extern std::string FullFileName;
 //Public FileNamePath As String
 extern std::string FileNamePath;
+//! EXTRA: The recent sub-hub level file
+extern std::string FileRecentSubHubLevel;
 //! EXTRA: The format of the current file
 extern int FileFormat;
 
@@ -1809,6 +1837,8 @@ extern int FileFormatWorld;
 
 //! EXTRA: Identify that episode is an intro level
 extern bool IsEpisodeIntro;
+//! EXTRA: Identify that level is a hub or sub-hub where player can save the game
+extern bool IsHubLevel;
 //Public Coins As Integer 'number of coins
 extern int Coins;
 //Public Lives As Single 'number of lives
@@ -1822,13 +1852,6 @@ extern bool ExitMenu;
 //Public LevelSelect As Boolean 'true if game should load the world map
 extern bool LevelSelect;
 
-/**
- * \brief NEW: utility function to check if in a hub level
- */
-inline bool InHub()
-{
-    return NoMap && IsEpisodeIntro;
-}
 
 extern bool LevelRestartRequested;
 //Public WorldPlayer(1) As WorldPlayer
@@ -1854,6 +1877,10 @@ extern RangeArrI<bool, 0, maxSections, false> UnderWater;
 
 // EXTRA: track extra JSON info from a loaded level
 extern RangeArrI<stringindex_t, 0, maxSections, STRINGINDEX_NONE> SectionJSONInfo;
+
+// world custom data
+extern std::string WldxCustomParams;
+extern std::vector<std::string> SubHubLevels;
 
 //Public TestLevel As Boolean
 extern bool TestLevel;

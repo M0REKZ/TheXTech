@@ -30,9 +30,10 @@
 #include "../core/render.h"
 #include "../core/events.h"
 #include "../controls.h"
-#include "compat.h"
 #include "pge_delay.h"
 #include "npc_id.h"
+
+#include "main/hints.h"
 
 
 static void initPlayers(Player_t tempPlayer[maxLocalPlayers])
@@ -122,7 +123,7 @@ static void initPlayers(Player_t tempPlayer[maxLocalPlayers])
         dst.Location.SpeedY = 0;
     }
 
-    if(numPlayers == 1)
+    if(numPlayers == 1 || g_ClonedPlayerMode)
     {
         tempPlayer[0].Location.X = XRender::TargetW / 2.0 - tempPlayer[0].Location.Width / 2.0;
         tempPlayer[0].Location.Y = XRender::TargetH / 2.0 - tempPlayer[0].Location.Height + 24;
@@ -157,12 +158,19 @@ static void initPlayers(Player_t tempPlayer[maxLocalPlayers])
 static void drawEnterScreen(Player_t tempPlayer[maxLocalPlayers])
 {
     for(int A = 0; A < numPlayers && A < maxLocalPlayers; ++A)
+    {
         DrawPlayer(tempPlayer[A], 0);
+
+        if(g_ClonedPlayerMode)
+            break;
+    }
 
     if(TestLevel)
         SuperPrintScreenCenter("LOADING...", 3, XRender::TargetH / 2.0f + 32);
     else
         DrawLives(XRender::TargetW / 2 - 14, XRender::TargetH / 2 + 31, Lives, g_100s);
+
+    XHints::Draw(XRender::TargetH / 2.0 + 64, 0);
 }
 
 
@@ -170,6 +178,8 @@ void GameThing(int waitms, int fadeSpeed)
 {
     Player_t tempPlayer[maxLocalPlayers];
     initPlayers(tempPlayer);
+
+    XHints::Select();
 
     if(waitms <= 0)
     {

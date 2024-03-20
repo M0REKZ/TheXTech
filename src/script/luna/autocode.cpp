@@ -306,7 +306,7 @@ void Autocode::Do(bool init)
             if(npc != nullptr)
             {
                 //float hits = *(((float *)((&(*(uint8_t *)npc)) + 0x148)));
-                int hits = Maths::iRound(npc->Damage);
+                int hits = npc->Damage;
                 Renderer::Get().AddOp(new RenderStringOp(fmt::format_ne("{0}", (base_health - hits)), 3, (float)Param1, (float)Param2));
             }
             else
@@ -669,6 +669,13 @@ void Autocode::Do(bool init)
                 gAutoMan.VarOperation(GetS(MyRef), Param2, (OPTYPE)(int)Param1);
             else
                 gAutoMan.VarOperation(GetS(MyString), Param2, (OPTYPE)(int)Param1);
+            break;
+        }
+
+        case AT_CopyVar:
+        {
+            if(ReferenceOK() && MyString != STRINGINDEX_NONE && gAutoMan.VarExists(GetS(MyString)))
+                gAutoMan.VarOperation(GetS(MyRef), gAutoMan.GetVar(GetS(MyString)), (OPTYPE)(int)Param1);
             break;
         }
 
@@ -1608,6 +1615,7 @@ static const std::unordered_map<std::string, AutocodeType> s_commandMap =
     {"RunCheat", AT_RunCheat},
 
     {"SetVar", AT_SetVar},
+    {"CopyVar", AT_CopyVar},
     {"LoadPlayerVar", AT_LoadPlayerVar},
     {"LoadNPCVar", AT_LoadNPCVar},
     {"LoadGlobalVar", AT_LoadGlobalVar},

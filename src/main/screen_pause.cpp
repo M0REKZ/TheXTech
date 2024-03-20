@@ -47,6 +47,7 @@
 
 #include "main/game_strings.h"
 #include "main/level_medals.h"
+#include "main/hints.h"
 
 #include "editor.h"
 
@@ -157,7 +158,7 @@ static bool s_QuitTesting()
 
 static bool s_SaveAndContinue()
 {
-    bool CanSave = (LevelSelect || (IsEpisodeIntro && NoMap)) && !Cheater;
+    bool CanSave = (LevelSelect || IsHubLevel) && !Cheater;
 
     if(CanSave)
     {
@@ -175,7 +176,7 @@ static bool s_SaveAndContinue()
 
 static bool s_Quit()
 {
-    bool CanSave = (LevelSelect || (IsEpisodeIntro && NoMap)) && !Cheater;
+    bool CanSave = (LevelSelect || IsHubLevel) && !Cheater;
 
     if(CanSave)
         SaveGame(); // "Save & Quit"
@@ -207,6 +208,8 @@ static bool s_Quit()
 
 void Init(int plr, bool LegacyPause)
 {
+    XHints::Select();
+
     PlaySound(SFX_Pause);
     MenuCursor = 0;
     MenuCursorCanMove = false;
@@ -225,7 +228,7 @@ void Init(int plr, bool LegacyPause)
     // do a context-aware initialization of s_items
     s_items.clear();
 
-    bool CanSave = (LevelSelect || (IsEpisodeIntro && NoMap)) && !Cheater && !TestLevel;
+    bool CanSave = (LevelSelect || IsHubLevel) && !Cheater && !TestLevel;
 
     // add pause menu items
 
@@ -291,7 +294,7 @@ void Init(int plr, bool LegacyPause)
 
     // GBA bounds
     if(total_menu_height > 320 || total_menu_width > 480)
-        pLogDebug("Menu doesn't fit within bounds (actual size %dx%d, bounds 480x320)", total_menu_width, total_menu_height);
+        pLogWarning("Menu doesn't fit within bounds (actual size %dx%d, bounds 480x320)", total_menu_width, total_menu_height);
 }
 
 void Render()
@@ -366,6 +369,9 @@ void Render()
         else
             XRender::renderTexture(menu_left_X - 20, menu_top_Y + (MenuCursor * 36), 16, 16, GFX.MCursor[0], 0, 0);
     }
+
+    if(XRender::TargetH > XRender::TargetH / 2 + menu_box_height / 2 + 16 + 96 + 8)
+        XHints::Draw(XRender::TargetH / 2 + menu_box_height / 2 + 16, 100, menu_box_width);
 }
 
 bool Logic(int plr)

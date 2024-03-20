@@ -231,7 +231,7 @@ void DrawInterface(int Z, int numScreens)
                    ScreenTop + 16 + 11);
     }
 
-    if(!InHub() && !BattleMode)
+    if(!IsHubLevel && !BattleMode)
     {
         // draw medals at top-right side of HUD
         int medals_x = SDL_min(static_cast<int>(vScreen[Z].Width) - 16, CenterX + 400 - 16);
@@ -330,7 +330,7 @@ static inline void s_DrawMedal(int i, int x, int y, int coin_width, int coin_hei
     }
 
     // render sparkles for shiny
-    if(level == MedalDrawLevel::Shiny)
+    if(level == MedalDrawLevel::Shiny && coin_width > 8 && coin_height > 8)
     {
         int sparkle_1_idx = ((CommonFrame + i * 16 * 37) % 1024) / 16; // on frame 3
 
